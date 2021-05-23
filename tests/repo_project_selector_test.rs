@@ -70,11 +70,11 @@ fn test_select_projects_with_all_filters() {
         "boiler,startbutton",
     );
     assert_select_projects(
-      false,
-      Some(vec![String::from("toplevel"), String::from("electrical")]),
-      Some(vec![String::from("libs.xml"), String::from("manifest.xml")]),
-      "coffeemaker,boiler,startbutton",
-  );
+        false,
+        Some(vec![String::from("toplevel"), String::from("electrical")]),
+        Some(vec![String::from("libs.xml"), String::from("manifest.xml")]),
+        "coffeemaker,boiler,startbutton",
+    );
 }
 
 fn assert_select_projects(

@@ -41,7 +41,7 @@ pub fn select_projects(
         for manifest_file in manifest_files {
             let manifest = parse_manifest(&repo_folder.join(&manifest_file))?;
             aggregated_manifest.append(&manifest);
-          }
+        }
         selected_projects = selected_projects
             .drain(..)
             .filter(|p| aggregated_manifest.contains_project(p))
@@ -134,7 +134,10 @@ pub struct Manifest {
 
 impl Manifest {
     pub fn empty() -> Self {
-      Manifest {projects:vec![], includes: vec![]}
+        Manifest {
+            projects: vec![],
+            includes: vec![],
+        }
     }
 
     pub fn append(&mut self, manifest: &Manifest) {
