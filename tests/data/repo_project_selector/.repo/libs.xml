@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="boiler" groups="electrical" path="boiler"/>
+  <project name="pressureliefvalve" groups="mechanical" path="pressureliefvalve"/>
+  <project name="pot" groups="mechanical" path="pot"/>
+  <project name="startbutton" groups="electrical" path="startbutton"/>
+</manifest>
