@@ -18,8 +18,8 @@ use std::path::PathBuf;
 /// itsself into the list (.repo/manifests).
 pub fn select_projects(
     include_manifest_repo: bool,
-    filter_by_groups: Option<Vec<String>>,
-    filter_by_manifest_files: Option<Vec<String>>,
+    filter_by_groups: Option<Vec<&str>>,
+    filter_by_manifest_files: Option<Vec<&str>>,
 ) -> Result<Vec<String>> {
     let projects_on_disk = lines_from_file(find_project_list()?)?;
     let mut selected_projects = projects_on_disk;
@@ -77,14 +77,14 @@ pub fn find_project_list() -> Result<PathBuf> {
 /// or Error in case the .repo folder couldn't been
 /// found in the cwd or any of its parent folders.
 pub fn find_repo_folder() -> Result<PathBuf> {
-    let base_folder = find_repo_base_folder()?;
+    let base_folder = find_repo_root_folder()?;
     Ok(base_folder.join(".repo"))
 }
 
 /// returns a path pointing to the folder containing .repo,
 /// or io::Error in case the .repo folder couldn't been
 /// found in the cwd or any of its parent folders.
-pub fn find_repo_base_folder() -> Result<PathBuf> {
+pub fn find_repo_root_folder() -> Result<PathBuf> {
     let cwd = env::current_dir()?;
     for parent in cwd.ancestors() {
         for entry in fs::read_dir(&parent)? {
@@ -163,7 +163,7 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn in_any_given_group(&self, test_for_groups: &[String]) -> bool {
+    pub fn in_any_given_group(&self, test_for_groups: &[&str]) -> bool {
         let project_groups: Vec<String> = self
             .groups
             .split(&[',', ' '][..])
