@@ -28,17 +28,17 @@ fn test_select_projects_with_group_filter() {
 
     assert_select_projects(
         false,
-        Some(vec![String::from("mechanical")]),
+        Some(vec!["mechanical"]),
         None,
         "pressureliefvalve,pot",
     );
     assert_select_projects(
         true,
-        Some(vec![String::from("electrical")]),
+        Some(vec!["electrical"]),
         None,
         "boiler,startbutton,.repo/manifests",
     );
-    assert_select_projects(false, Some(vec![String::from("chemical")]), None, "");
+    assert_select_projects(false, Some(vec!["chemical"]), None, "");
 }
 
 #[test]
@@ -48,13 +48,13 @@ fn test_select_projects_with_manifest_filter() {
     assert_select_projects(
         false,
         None,
-        Some(vec![String::from("libs.xml")]),
+        Some(vec!["libs.xml"]),
         "boiler,pressureliefvalve,pot,startbutton",
     );
     assert_select_projects(
         false,
         None,
-        Some(vec![String::from("manifest.xml")]),
+        Some(vec!["manifest.xml"]),
         "coffeemaker,boiler,pressureliefvalve,pot,startbutton",
     );
 }
@@ -65,22 +65,22 @@ fn test_select_projects_with_all_filters() {
 
     assert_select_projects(
         false,
-        Some(vec![String::from("toplevel"), String::from("electrical")]),
-        Some(vec![String::from("libs.xml")]),
+        Some(vec!["toplevel", "electrical"]),
+        Some(vec!["libs.xml"]),
         "boiler,startbutton",
     );
     assert_select_projects(
         false,
-        Some(vec![String::from("toplevel"), String::from("electrical")]),
-        Some(vec![String::from("libs.xml"), String::from("manifest.xml")]),
+        Some(vec!["toplevel", "electrical"]),
+        Some(vec!["libs.xml", "manifest.xml"]),
         "coffeemaker,boiler,startbutton",
     );
 }
 
 fn assert_select_projects(
     include_manifest_repo: bool,
-    filter_by_groups: Option<Vec<String>>,
-    filter_by_manifest_files: Option<Vec<String>>,
+    filter_by_groups: Option<Vec<&str>>,
+    filter_by_manifest_files: Option<Vec<&str>>,
     expected_seclection: &str,
 ) {
     assert_eq!(

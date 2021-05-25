@@ -8,5 +8,10 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.40"
+clap = "2.33.3"
+colored = "2"
+crossbeam = "0.8.0"
+indicatif = { version = "0.16.2", features = ["rayon"] }
+rayon = "1.5.1"
 serde = {version = "1.0.125", features = ["derive"]}
 serde-xml-rs = "0.4.1"
