@@ -36,10 +36,10 @@ pub fn select_projects(
     }
 
     if let Some(manifest_files) = filter_by_manifest_files {
-        let repo_folder = find_repo_folder()?;
+        let repo_manifests_folder = find_repo_manifests_folder()?;
         let mut aggregated_manifest = Manifest::empty();
         for manifest_file in manifest_files {
-            let manifest = parse_manifest(&repo_folder.join(&manifest_file))?;
+            let manifest = parse_manifest(&repo_manifests_folder.join(&manifest_file))?;
             aggregated_manifest.append(&manifest);
         }
         selected_projects = selected_projects
@@ -81,6 +81,14 @@ pub fn find_repo_folder() -> Result<PathBuf> {
     Ok(base_folder.join(".repo"))
 }
 
+/// returns a path pointing to the .repo/manifests folder,
+/// or Error in case the .repo folder couldn't been
+/// found in the cwd or any of its parent folders.
+pub fn find_repo_manifests_folder() -> Result<PathBuf> {
+    let base_folder = find_repo_folder()?;
+    Ok(base_folder.join("manifests"))
+}
+
 /// returns a path pointing to the folder containing .repo,
 /// or io::Error in case the .repo folder couldn't been
 /// found in the cwd or any of its parent folders.
@@ -103,7 +111,7 @@ pub fn parse_manifest(path: &Path) -> Result<Manifest> {
     let mut manifest: Manifest = from_reader(reader)?;
     let includes: Vec<String> = manifest.includes.iter().map(|i| i.name.clone()).collect();
     for include in &includes {
-        let path = path.with_file_name(include);
+        let path = find_repo_manifests_folder()?.join(include);
         let child = parse(&path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
         manifest.append(&child);
     }

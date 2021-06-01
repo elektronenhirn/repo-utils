@@ -54,7 +54,7 @@ fn test_select_projects_with_manifest_filter() {
     assert_select_projects(
         false,
         None,
-        Some(vec!["manifest.xml"]),
+        Some(vec!["../manifest.xml"]),
         "coffeemaker,boiler,pressureliefvalve,pot,startbutton",
     );
 }
@@ -72,7 +72,7 @@ fn test_select_projects_with_all_filters() {
     assert_select_projects(
         false,
         Some(vec!["toplevel", "electrical"]),
-        Some(vec!["libs.xml", "manifest.xml"]),
+        Some(vec!["libs.xml", "../manifest.xml"]),
         "coffeemaker,boiler,startbutton",
     );
 }
