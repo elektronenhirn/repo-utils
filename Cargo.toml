@@ -1,8 +1,11 @@
 [package]
 name = "repo-utils"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Florian Bramer <elektronenhirn@gmail.com>"]
 edition = "2018"
+description="Utilities for google's repo-tool"
+license="MIT"
+readme="README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
