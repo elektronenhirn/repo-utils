@@ -17,11 +17,28 @@ FLAGS:
     -v, --verbose      Verbose output, e.g. print local path before executing command
 
 OPTIONS:
-    -C, --cwd <cwd>                 change working directory (mostly useful for testing) [default:
-                                    /mnt/ssd2/flo/code/repo-utils]
+    -C, --cwd <cwd>                 change working directory (mostly useful for testing)
     -m, --manifest <filename>...    ignore projects which are not defined in the given manifest file(s)
     -g, --group <groupname>...      ignore projects which are not part of the given group(s)
 
 ARGS:
     <command>...    The command line to execute on each selected project
+```
+
+## repo-status
+```
+Check if repos managed by git-repo have uncommited changes
+
+USAGE:
+    repo-status [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+    -v, --verbose    Verbose output, e.g. print local path before executing command
+
+OPTIONS:
+    -C, --cwd <cwd>                 change working directory (mostly useful for testing)
+    -m, --manifest <filename>...    ignore projects which are not defined in the given manifest file(s)
+    -g, --group <groupname>...      ignore projects which are not part of the given group(s)
 ```
