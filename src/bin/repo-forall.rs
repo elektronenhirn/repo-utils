@@ -14,10 +14,11 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output};
 use std::str;
+use std::time::Instant;
 
 fn main() -> Result<()> {
     let original_cwd = env::current_dir().expect("cwd not found");
-    let cli_args = App::new("repo-for-all")
+    let cli_args = App::new("repo-forall")
         .version(crate_version!())
         .author("Florian Bramer <elektronenhirn@gmail.com>")
         .about("Execute commands on git repositories managed by repo")
@@ -48,10 +49,11 @@ fn main() -> Result<()> {
         )
         .arg(
             Arg::with_name("command")
-                .help("The command line to execute on each selected project")
-                .multiple(true)
+                .short("c")
+                .long("command")
+                .takes_value(true)
                 .required(true)
-                .index(1),
+                .help("The command line to execute on each selected project"),
         )
         .arg(
             Arg::with_name("verbose")
@@ -99,6 +101,8 @@ fn forall(
     verbose: bool,
     fail_fast: bool,
 ) -> Result<()> {
+    let timestamp_before_exec = Instant::now();
+
     let repo_root_folder = find_repo_root_folder()?;
 
     // Create a simple streaming channel
@@ -152,7 +156,8 @@ fn forall(
     match failed {
         0 => {
             println!(
-                "Done: {}/{} executions succeeded, {} failed",
+                "Finished in {}s: {}/{} executions succeeded, {} failed",
+                timestamp_before_exec.elapsed().as_secs(),
                 succeeded,
                 list_of_projects.len(),
                 failed
@@ -160,7 +165,8 @@ fn forall(
             Ok(())
         }
         _ => Err(anyhow!(
-            "{} executions failed, {}/{} succeeded",
+            "Finished in {}s: {} executions failed, {}/{} succeeded",
+            timestamp_before_exec.elapsed().as_secs(),
             failed,
             succeeded,
             list_of_projects.len()
