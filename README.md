@@ -13,14 +13,15 @@ Arguments:
   [COMMAND]...
 
 Options:
-  -C, --cwd <DIR>        change working directory (mostly useful for testing)
-  -m, --manifest <FILE>  ignore projects which are not defined in the given manifest file(s)
-  -g, --group <GROUP>    ignore projects which are not part of the given group(s)
-  -v, --verbose          Verbose output, e.g. print local path before executing command
-  -f, --fail-fast        Stop running commands for anymore projects whenever one failed
-  -h, --help             Print help information
-  -V, --version          Print version information
-```
+  -C, --cwd <DIR>           change working directory (mostly useful for testing)
+  -m, --manifest <FILE>     ignore projects which are not defined in the given manifest file(s)
+  -g, --group <GROUP>       ignore projects which are not part of the given group(s)
+  -v, --verbose             Verbose output
+  -f, --fail-fast           Stop running commands for anymore projects whenever one failed
+  -p, --print-project-path  Print project path before printing command output
+  -h, --help                Print help information
+  -V, --version             Print version information
+  ```
 
 Supports the following environment variables in the command:
 
