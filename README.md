@@ -5,40 +5,34 @@ A collection of commands to work on git repositories managed by google's repo to
 
 ## repo-forall
 ```
-Execute commands on git repositories managed by repo
+Execute commands on git repositories managed by repo, see https://github.com/elektronenhirn/repo-utils
 
-USAGE:
-    repo-forall [FLAGS] [OPTIONS] <command>...
+Usage: repo-forall [OPTIONS] [COMMAND]...
 
-FLAGS:
-    -f, --fail-fast    Stop running commands for upcoming projects whenever one failed
-    -h, --help         Prints help information
-    -V, --version      Prints version information
-    -v, --verbose      Verbose output, e.g. print local path before executing command
+Arguments:
+  [COMMAND]...
 
-OPTIONS:
-    -C, --cwd <cwd>                 change working directory (mostly useful for testing)
-    -m, --manifest <filename>...    ignore projects which are not defined in the given manifest file(s)
-    -g, --group <groupname>...      ignore projects which are not part of the given group(s)
-
-ARGS:
-    <command>...    The command line to execute on each selected project
+Options:
+  -C, --cwd <DIR>        change working directory (mostly useful for testing)
+  -m, --manifest <FILE>  ignore projects which are not defined in the given manifest file(s)
+  -g, --group <GROUP>    ignore projects which are not part of the given group(s)
+  -v, --verbose          Verbose output, e.g. print local path before executing command
+  -f, --fail-fast        Stop running commands for anymore projects whenever one failed
+  -h, --help             Print help information
+  -V, --version          Print version information
 ```
 
 ## repo-status
 ```
-Check if repos managed by git-repo have uncommited changes
+Check if repos managed by git-repo have uncommited changes, see https://github.com/elektronenhirn/repo-utils
 
-USAGE:
-    repo-status [FLAGS] [OPTIONS]
+Usage: repo-status [OPTIONS]
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-    -v, --verbose    Verbose output, e.g. print local path before executing command
-
-OPTIONS:
-    -C, --cwd <cwd>                 change working directory (mostly useful for testing)
-    -m, --manifest <filename>...    ignore projects which are not defined in the given manifest file(s)
-    -g, --group <groupname>...      ignore projects which are not part of the given group(s)
+Options:
+  -C, --cwd <DIR>        change working directory (mostly useful for testing)
+  -m, --manifest <FILE>  ignore projects which are not defined in the given manifest file(s)
+  -g, --group <GROUP>    ignore projects which are not part of the given group(s)
+  -v, --verbose          Verbose output, e.g. print local path before executing command
+  -h, --help             Print help information
+  -V, --version          Print version information
 ```

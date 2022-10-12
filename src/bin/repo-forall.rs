@@ -1,7 +1,7 @@
 extern crate clap;
 
-use anyhow::{anyhow, Error, Result};
-use clap::{crate_version, App, Arg};
+use anyhow::{anyhow, Error, Result, bail};
+use clap::{Parser};
 use colored::*;
 use crossbeam::channel::unbounded;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
@@ -11,87 +11,58 @@ use std::env;
 use std::fmt;
 use std::io;
 use std::io::Write;
-use std::path::Path;
 use std::process::{Command, Output};
 use std::str;
 use std::time::Instant;
 
-fn main() -> Result<()> {
-    let original_cwd = env::current_dir().expect("cwd not found");
-    let cli_args = App::new("repo-forall")
-        .version(crate_version!())
-        .author("Florian Bramer <elektronenhirn@gmail.com>")
-        .about("Execute commands on git repositories managed by repo")
-        .arg(
-            Arg::with_name("cwd")
-                .short("C")
-                .long("cwd")
-                .value_name("cwd")
-                .help("change working directory (mostly useful for testing)")
-                .default_value(original_cwd.to_str().unwrap())
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("filename")
-                .short("m")
-                .long("manifest")
-                .takes_value(true)
-                .multiple(true)
-                .help("ignore projects which are not defined in the given manifest file(s)"),
-        )
-        .arg(
-            Arg::with_name("groupname")
-                .short("g")
-                .long("group")
-                .takes_value(true)
-                .multiple(true)
-                .help("ignore projects which are not part of the given group(s)"),
-        )
-        .arg(
-            Arg::with_name("command")
-                .short("c")
-                .long("command")
-                .takes_value(true)
-                .required(true)
-                .help("The command line to execute on each selected project"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .help("Verbose output, e.g. print local path before executing command"),
-        )
-        .arg(
-            Arg::with_name("fail-fast")
-                .short("f")
-                .long("fail-fast")
-                .help("Stop running commands for upcoming projects whenever one failed"),
-        )
-        .get_matches();
-    let cwd = Path::new(cli_args.value_of("cwd").unwrap());
-    env::set_current_dir(cwd)?;
+/// Execute commands on git repositories managed by repo,
+/// see https://github.com/elektronenhirn/repo-utils
+#[derive(Parser, Debug)]
+#[command(author, version, long_about = None)]
+struct Args {
+    /// change working directory (mostly useful for testing)
+    #[arg(short = 'C', long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
+    cwd: Option<std::path::PathBuf>,
 
-    let list_of_projects = select_projects(
-        false,
-        cli_args
-            .values_of("groupname")
-            .map(|values| values.collect::<Vec<_>>()),
-        cli_args
-            .values_of("filename")
-            .map(|values| values.collect::<Vec<_>>()),
-    )?;
+    /// ignore projects which are not defined in the given manifest file(s)
+    #[arg(short, long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
+    manifest: Option<Vec<std::path::PathBuf>>,
+
+    /// ignore projects which are not part of the given group(s)
+    #[arg(short, long)]
+    group: Option<Vec<String>>,
+
+    /// Verbose output, e.g. print local path before executing command
+    #[arg(short, long, default_value = "false")]
+    verbose: bool,
+
+    /// Stop running commands for anymore projects whenever one failed
+    #[arg(short, long, default_value = "false")]
+    fail_fast: bool,
+
+    command: Vec<String>,
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    if let Some(cwd) = args.cwd {
+        env::set_current_dir(cwd)?;
+    }
+
+    if args.command.is_empty() {
+        bail!("No command given")
+    }
+
+    let list_of_projects = select_projects(false, args.group, args.manifest)?;
 
     println!("Selected {} projects", list_of_projects.len());
 
     forall(
         list_of_projects,
-        cli_args
-            .values_of("command")
-            .expect("command given")
-            .collect::<Vec<_>>()
-            .join(" "),
-        cli_args.is_present("verbose"),
-        cli_args.is_present("fail-fast"),
+        args.command.join(" "),
+        args.verbose,
+        args.fail_fast,
     )
 }
 
@@ -107,15 +78,14 @@ fn forall(
 
     // Create a simple streaming channel
     let (tx, rx) = unbounded();
-    let overall_progress = ProgressBar::new(list_of_projects.len() as u64);
-    overall_progress.set_style(
+    let progress_bar = ProgressBar::new(list_of_projects.len() as u64).with_style(
         ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"),
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}")?,
     );
 
     let _ = list_of_projects
         .par_iter()
-        .progress_with(overall_progress)
+        .progress_with(progress_bar)
         .try_for_each(|path| {
             let output = CommandOutput::new(
                 &path,
