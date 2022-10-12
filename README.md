@@ -22,6 +22,15 @@ Options:
   -V, --version          Print version information
 ```
 
+Supports the following environment variables in the command:
+
+- `REPO_PATH`: relative path to the project
+
+Example:
+
+```
+repo-forall 'echo $REPO_PATH'
+```
 ## repo-status
 ```
 Check if repos managed by git-repo have uncommited changes, see https://github.com/elektronenhirn/repo-utils
