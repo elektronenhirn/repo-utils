@@ -93,6 +93,7 @@ fn forall(
                     .current_dir(&repo_root_folder.join(path))
                     .arg("-c")
                     .arg(&command)
+                    .env("REPO_PATH", path)
                     .output()
                     .map_err(Error::msg),
             );
@@ -108,18 +109,14 @@ fn forall(
         });
 
     let (mut succeeded, mut failed) = (0, 0);
-    loop {
-        match rx.try_recv() {
-            Err(_) => break,
-            Ok(output) => {
-                match output.success() {
-                    true => succeeded += 1,
-                    false => failed += 1,
-                }
-                output.print(verbose);
-            }
+
+    rx.try_iter().for_each(|output| {
+        match output.success() {
+            true => succeeded += 1,
+            false => failed += 1,
         }
-    }
+        output.print(verbose);
+    });
 
     println!();
 
