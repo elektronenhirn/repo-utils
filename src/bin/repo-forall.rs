@@ -32,13 +32,17 @@ struct Args {
     #[arg(short, long)]
     group: Option<Vec<String>>,
 
-    /// Verbose output, e.g. print local path before executing command
+    /// Verbose output
     #[arg(short, long, default_value = "false")]
     verbose: bool,
 
     /// Stop running commands for anymore projects whenever one failed
     #[arg(short, long, default_value = "false")]
     fail_fast: bool,
+
+    /// Print project path before printing command output
+    #[arg(short, long, default_value = "false")]
+    print_project_path: bool,
 
     command: Vec<String>,
 }
@@ -61,16 +65,16 @@ fn main() -> Result<()> {
     forall(
         list_of_projects,
         args.command.join(" "),
-        args.verbose,
         args.fail_fast,
+        args.print_project_path,
     )
 }
 
 fn forall(
     list_of_projects: Vec<String>,
     command: String,
-    verbose: bool,
     fail_fast: bool,
+    print_project_path: bool,
 ) -> Result<()> {
     let timestamp_before_exec = Instant::now();
 
@@ -115,7 +119,7 @@ fn forall(
             true => succeeded += 1,
             false => failed += 1,
         }
-        output.print(verbose);
+        output.print(print_project_path);
     });
 
     println!();
@@ -161,21 +165,21 @@ impl CommandOutput {
         }
     }
 
-    pub fn print(&self, verbose: bool) {
-        if !self.success() {
-            //when command failed, always print local path
-            println!("{}:", self.path.red());
-        } else if verbose {
-            println!("{}:", self.path.yellow());
+    pub fn print(&self, print_project_path: bool) {
+        if print_project_path {
+            println!("\n{}:", self.path.green());
         }
-        match &self.output {
-            Ok(output) => {
-                let _ = io::stdout().write_all(&output.stdout);
-                let _ = io::stdout().write_all(&output.stderr);
-            }
-            Err(e) => {
-                eprintln!("Failed to execute given command: {}", e);
-            }
+
+        if !self.success() {
+            eprintln!(
+                "{}: {}:",
+                self.path.red(),
+                "failed to execute given command".red()
+            );
+        }
+        if let Ok(output) = &self.output {
+            let _ = io::stdout().write_all(&output.stdout);
+            let _ = io::stdout().write_all(&output.stderr);
         }
     }
 }
