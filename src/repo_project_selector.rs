@@ -167,13 +167,15 @@ impl Manifest {
 pub struct Project {
     pub name: String,
     pub path: String,
-    pub groups: String,
+    pub groups: Option<String>,
 }
 
 impl Project {
     pub fn in_any_given_group(&self, test_for_groups: &[String]) -> bool {
         let project_groups: Vec<String> = self
             .groups
+            .as_ref()
+            .unwrap_or(&String::new())
             .split(&[',', ' '][..])
             .map(|s| s.to_string())
             .collect();
