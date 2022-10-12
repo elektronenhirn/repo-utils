@@ -1,7 +1,7 @@
 extern crate clap;
 
 use anyhow::{bail, Context, Result};
-use clap::{crate_version, App, Arg};
+use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
 use git2::{Repository, StatusOptions};
@@ -9,64 +9,43 @@ use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects};
 use std::env;
-use std::path::Path;
 use std::str;
 use std::time::Instant;
 
-fn main() -> Result<()> {
-    let original_cwd = env::current_dir().expect("cwd not found");
-    let cli_args = App::new("repo-status")
-        .version(crate_version!())
-        .author("Florian Bramer <elektronenhirn@gmail.com>")
-        .about("Check if repos managed by git-repo have uncommited changes")
-        .arg(
-            Arg::with_name("cwd")
-                .short("C")
-                .long("cwd")
-                .value_name("cwd")
-                .help("change working directory (mostly useful for testing)")
-                .default_value(original_cwd.to_str().unwrap())
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("filename")
-                .short("m")
-                .long("manifest")
-                .takes_value(true)
-                .multiple(true)
-                .help("ignore projects which are not defined in the given manifest file(s)"),
-        )
-        .arg(
-            Arg::with_name("groupname")
-                .short("g")
-                .long("group")
-                .takes_value(true)
-                .multiple(true)
-                .help("ignore projects which are not part of the given group(s)"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .help("Verbose output, e.g. print local path before executing command"),
-        )
-        .get_matches();
-    let cwd = Path::new(cli_args.value_of("cwd").unwrap());
-    env::set_current_dir(cwd)?;
+/// Check if repos managed by git-repo have uncommited changes,
+/// see https://github.com/elektronenhirn/repo-utils
+#[derive(Parser, Debug)]
+#[command(author, version, long_about = None)]
+struct Args {
+    /// change working directory (mostly useful for testing)
+    #[arg(short = 'C', long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
+    cwd: Option<std::path::PathBuf>,
 
-    let list_of_projects = select_projects(
-        false,
-        cli_args
-            .values_of("groupname")
-            .map(|values| values.collect::<Vec<_>>()),
-        cli_args
-            .values_of("filename")
-            .map(|values| values.collect::<Vec<_>>()),
-    )?;
+    /// ignore projects which are not defined in the given manifest file(s)
+    #[arg(short, long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
+    manifest: Option<Vec<std::path::PathBuf>>,
+
+    /// ignore projects which are not part of the given group(s)
+    #[arg(short, long)]
+    group: Option<Vec<String>>,
+
+    /// Verbose output, e.g. print local path before executing command
+    #[arg(short, long, default_value = "false")]
+    verbose: bool,
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    if let Some(cwd) = args.cwd {
+        env::set_current_dir(cwd)?;
+    }
+
+    let list_of_projects = select_projects(false, args.group, args.manifest)?;
 
     println!("Selected {} projects", list_of_projects.len());
 
-    status(list_of_projects, cli_args.is_present("verbose"))
+    status(list_of_projects, args.verbose)
 }
 
 fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
@@ -74,17 +53,17 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
 
     // Create a simple streaming channel
     let (tx, rx) = unbounded();
-    let overall_progress = ProgressBar::new(list_of_projects.len() as u64);
-    overall_progress.set_style(
+
+    let progress_bar = ProgressBar::new(list_of_projects.len() as u64).with_style(
         ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}"),
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}")?,
     );
 
     let repo_root_folder = find_repo_root_folder()?;
 
     let _ = list_of_projects
         .par_iter()
-        .progress_with(overall_progress)
+        .progress_with(progress_bar)
         .try_for_each(|path| {
             let repo = Repository::open(repo_root_folder.join(&path))
                 .with_context(|| format!("Failed to open git repo at {:?}", path))?;

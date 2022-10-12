@@ -1,6 +1,6 @@
 use repo_utils::repo_project_selector::select_projects;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const TEST_DATA_SUBFOLDER: &str = "data/repo_project_selector";
 
@@ -28,17 +28,17 @@ fn test_select_projects_with_group_filter() {
 
     assert_select_projects(
         false,
-        Some(vec!["mechanical"]),
+        Some(vec!["mechanical".to_string()]),
         None,
         "pressureliefvalve,pot",
     );
     assert_select_projects(
         true,
-        Some(vec!["electrical"]),
+        Some(vec!["electrical".to_string()]),
         None,
         "boiler,startbutton,.repo/manifests",
     );
-    assert_select_projects(false, Some(vec!["chemical"]), None, "");
+    assert_select_projects(false, Some(vec!["chemical".to_string()]), None, "");
 }
 
 #[test]
@@ -48,13 +48,13 @@ fn test_select_projects_with_manifest_filter() {
     assert_select_projects(
         false,
         None,
-        Some(vec!["libs.xml"]),
+        Some(vec![PathBuf::from("libs.xml")]),
         "boiler,pressureliefvalve,pot,startbutton",
     );
     assert_select_projects(
         false,
         None,
-        Some(vec!["../manifest.xml"]),
+        Some(vec![PathBuf::from("../manifest.xml")]),
         "coffeemaker,boiler,pressureliefvalve,pot,startbutton",
     );
 }
@@ -65,22 +65,25 @@ fn test_select_projects_with_all_filters() {
 
     assert_select_projects(
         false,
-        Some(vec!["toplevel", "electrical"]),
-        Some(vec!["libs.xml"]),
+        Some(vec!["toplevel".to_string(), "electrical".to_string()]),
+        Some(vec![PathBuf::from("libs.xml")]),
         "boiler,startbutton",
     );
     assert_select_projects(
         false,
-        Some(vec!["toplevel", "electrical"]),
-        Some(vec!["libs.xml", "../manifest.xml"]),
+        Some(vec!["toplevel".to_string(), "electrical".to_string()]),
+        Some(vec![
+            PathBuf::from("libs.xml"),
+            PathBuf::from("../manifest.xml"),
+        ]),
         "coffeemaker,boiler,startbutton",
     );
 }
 
 fn assert_select_projects(
     include_manifest_repo: bool,
-    filter_by_groups: Option<Vec<&str>>,
-    filter_by_manifest_files: Option<Vec<&str>>,
+    filter_by_groups: Option<Vec<String>>,
+    filter_by_manifest_files: Option<Vec<PathBuf>>,
     expected_seclection: &str,
 ) {
     assert_eq!(

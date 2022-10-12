@@ -18,8 +18,8 @@ use std::path::PathBuf;
 /// itsself into the list (.repo/manifests).
 pub fn select_projects(
     include_manifest_repo: bool,
-    filter_by_groups: Option<Vec<&str>>,
-    filter_by_manifest_files: Option<Vec<&str>>,
+    filter_by_groups: Option<Vec<String>>,
+    filter_by_manifest_files: Option<Vec<PathBuf>>,
 ) -> Result<Vec<String>> {
     let projects_on_disk = lines_from_file(find_project_list()?)?;
     let mut selected_projects = projects_on_disk;
@@ -171,7 +171,7 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn in_any_given_group(&self, test_for_groups: &[&str]) -> bool {
+    pub fn in_any_given_group(&self, test_for_groups: &[String]) -> bool {
         let project_groups: Vec<String> = self
             .groups
             .split(&[',', ' '][..])
