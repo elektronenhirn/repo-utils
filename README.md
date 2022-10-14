@@ -3,7 +3,23 @@ Utilities for google's repo-tool written in Rust
 
 A collection of commands to work on git repositories managed by google's repo tool.
 
-## repo-forall
+## Installation
+
+repo-utils is written in rust. You need the rust toolchain installed to be able to use it:
+
+https://www.rust-lang.org/tools/install
+
+Then you simply install the latest repo-utils release with:
+
+```
+cargo install repo-utils
+```
+
+from the central crates.io repository
+
+## Usage
+
+### repo-forall
 ```
 Execute commands on git repositories managed by repo, see https://github.com/elektronenhirn/repo-utils
 
@@ -32,7 +48,7 @@ Example:
 ```
 repo-forall 'echo $REPO_PATH'
 ```
-## repo-status
+### repo-status
 ```
 Check if repos managed by git-repo have uncommited changes, see https://github.com/elektronenhirn/repo-utils
 
