@@ -1,6 +1,6 @@
 [package]
 name = "repo-utils"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Florian Bramer <elektronenhirn@gmail.com>"]
 edition = "2018"
 description="Utilities for google's repo-tool"
