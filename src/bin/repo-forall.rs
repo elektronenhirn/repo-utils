@@ -92,7 +92,7 @@ fn forall(
         .progress_with(progress_bar)
         .try_for_each(|path| {
             let output = CommandOutput::new(
-                &path,
+                path,
                 Command::new("sh")
                     .current_dir(&repo_root_folder.join(path))
                     .arg("-c")

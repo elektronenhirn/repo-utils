@@ -72,7 +72,7 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
             }
 
             let statuses = repo.statuses(Some(&mut default_status_options()))?;
-            let _ = tx.send(GitStatus::new(&path, !statuses.is_empty()));
+            let _ = tx.send(GitStatus::new(path, !statuses.is_empty()));
 
             Ok(())
         });
@@ -82,9 +82,8 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
     repo_statuses.sort();
 
     repo_statuses.iter().for_each(|v| {
-        match v.dirty {
-            true => dirty += 1,
-            _ => (),
+        if v.dirty {
+            dirty += 1;
         }
         v.print(verbose);
     });
