@@ -7,12 +7,14 @@ use crossbeam::channel::unbounded;
 use git2::{Repository, StatusOptions};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects};
-use std::env;
+use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects, find_repo_manifests_folder};
+use std::convert::TryInto;
+use std::{env, any};
+use std::process::{Command, Output};
 use std::str;
 use std::time::Instant;
 
-/// Check if repos managed by git-repo have uncommited changes,
+/// Check if repos managed by git-repo have local-only or uncommited changes,
 /// see https://github.com/elektronenhirn/repo-utils
 #[derive(Parser, Debug)]
 #[command(author, version, long_about = None)]
@@ -51,6 +53,8 @@ fn main() -> Result<()> {
 fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
     let timestamp_before_scanning = Instant::now();
 
+    let sync_branch_name = lookup_sync_branch_name()?;
+
     // Create a simple streaming channel
     let (tx, rx) = unbounded();
 
@@ -72,18 +76,33 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
             }
 
             let statuses = repo.statuses(Some(&mut default_status_options()))?;
-            let _ = tx.send(GitStatus::new(path, !statuses.is_empty()));
+            
+            let last_repo_sync_tree = repo.find_branch(&sync_branch_name, git2::BranchType::Remote).map(|b| b.get().peel_to_tree()).with_context(|| format!("{:?}", path))??;
+            let head_tree = repo.head()?.peel_to_tree().with_context(|| format!("{:?}", path))?;
+
+            let local_commits = repo.diff_tree_to_tree(
+                Some(&last_repo_sync_tree),
+                Some(&head_tree),
+                None
+            )?;
+
+            let _ = tx.send(GitStatus::new(path, !statuses.is_empty(),local_commits.deltas().len().try_into().unwrap()));
 
             Ok(())
-        });
+        })
+        .expect("Querying status failed");
 
     let mut dirty = 0;
+    let mut local_commits = 0;
     let mut repo_statuses: Vec<_> = rx.try_iter().collect();
     repo_statuses.sort();
 
     repo_statuses.iter().for_each(|v| {
-        if v.dirty {
+        if v.uncomitted_changes {
             dirty += 1;
+        }
+        if v.local_commits > 0 {
+            local_commits += 1;
         }
         v.print(verbose);
     });
@@ -91,9 +110,10 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
     println!();
 
     println!(
-        "Finished in {}s: {}/{} git repos dirty",
+        "Finished in {}s: {}+{}/{} git repos dirty",
         timestamp_before_scanning.elapsed().as_secs(),
         dirty,
+        local_commits,
         list_of_projects.len(),
     );
 
@@ -109,23 +129,53 @@ fn default_status_options() -> StatusOptions {
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct GitStatus {
     pub path: String,
-    pub dirty: bool,
+    pub uncomitted_changes: bool,
+    pub local_commits: i32
 }
 
 impl GitStatus {
-    pub fn new(path: &str, dirty: bool) -> Self {
+    pub fn new(path: &str, dirty: bool, local_commits: i32) -> Self {
         GitStatus {
             path: path.to_string(),
-            dirty,
+            uncomitted_changes: dirty,
+            local_commits,
         }
     }
 
     pub fn print(&self, verbose: bool) {
-        if self.dirty {
-            //when command failed, always print local path
-            println!("{}: dirty", self.path.red());
-        } else if verbose {
+        if self.uncomitted_changes {
+            println!("{}: uncommited changes", self.path.red());
+        }
+        if self.local_commits > 0 {
+            println!("{}: {} local commits", self.path.red(), self.local_commits);
+        } 
+        
+        if verbose && !self.uncomitted_changes && self.local_commits == 0{
             println!("{}: clean", self.path.green());
         }
     }
 }
+
+// The repo tool maintains a branch tracking the last synced state
+// It is typically named "m/<manifest-branch>" where manifest-branch
+// is the branch used for "repo init".
+fn lookup_sync_branch_name() -> Result<String> {
+    // in .repo/manifests
+    //git for-each-ref --format '%(upstream:lstrip=-1)' "$(git symbolic-ref -q HEAD)"
+
+    let manifests_folder = find_repo_manifests_folder()?;
+
+    Command::new("sh")
+            .current_dir(&manifests_folder)
+            .arg("-c")
+            .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
+            .output()
+            .map_or_else(|e| bail!(e), |o| {
+                match o.status.success() {
+                    true => Ok(String::from_utf8_lossy(&o.stdout).into_owned()),
+                    false => bail!(String::from_utf8_lossy(&o.stderr).into_owned())
+                }
+            })
+            .map(|s| "m/".to_string() + s.trim())
+}
+
