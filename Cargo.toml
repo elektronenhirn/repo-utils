@@ -11,11 +11,24 @@ readme="README.md"
 
 [dependencies]
 anyhow = "1.0.40"
+app_dirs = "1.2.1"
+chrono = "0.4.10"
 clap = {version = "4.0.13", features = ["cargo", "derive"] }
 colored = "2"
+console = "0.15.2"
 crossbeam = "0.8.0"
+csv = "1.1.4"
+cursive = { version = "0.20", features = ["toml"] }
 git2 = "0.15.0"
 indicatif = { version = "0.17.0", features = ["rayon"] }
+lazy_static = "1.4.0"
+log = "0.4.8"
+num_cpus = "1.12.0"
 rayon = "1.5.1"
 serde = {version = "1.0.125", features = ["derive"]}
+serde_any = { version = "0.5", default-features = false, features = ["toml"] }
 serde-xml-rs = "0.6.0"
+simple_logger = "1.5.0"
+spsheet = { version = "0.1.0", features = ["ods","xlsx"]}
+time = "0.3.17"
+toml = "0.5.6"
