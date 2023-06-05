@@ -1,0 +1,14 @@
+# Basic Cursive theme configuration for repo-history
+[colors]
+background = "default"
+view = "default"
+primary = "default"
+secondary = "blue"
+tertiary = "white"
+title_primary = "red"
+title_secondary = "yellow"
+highlight = "red"
+highlight_inactive = "blue"
+
+[borders]
+outline = true
