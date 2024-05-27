@@ -48,6 +48,7 @@ Example:
 ```
 repo-forall 'echo $REPO_PATH'
 ```
+
 ### repo-status
 ```
 Check if repos managed by git-repo have uncommited changes, see https://github.com/elektronenhirn/repo-utils
@@ -61,4 +62,21 @@ Options:
   -v, --verbose          Verbose output, e.g. print local path before executing command
   -h, --help             Print help information
   -V, --version          Print version information
+```
+
+### repo-restore
+
+```
+Restore repos managed by git-repo to the last "repo sync" state, see https://github.com/elektronenhirn/repo-utils
+
+Usage: repo-restore [OPTIONS]
+
+Options:
+  -C, --cwd <DIR>        change working directory (mostly useful for testing)
+  -m, --manifest <FILE>  ignore projects which are not defined in the given manifest file(s)
+  -g, --group <GROUP>    ignore projects which are not part of the given group(s)
+  -v, --verbose          Verbose output, e.g. print local path before executing command
+  -d, --dry-run          Dry-run, only lists "dirty" repositories, does not take any actions
+  -h, --help             Print help
+  -V, --version          Print version
 ```
