@@ -9,8 +9,8 @@ use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects, find_repo_manifests_folder};
 use std::convert::TryInto;
-use std::{env, any};
-use std::process::{Command, Output};
+use std::{env};
+use std::process::{Command};
 use std::str;
 use std::time::Instant;
 

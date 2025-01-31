@@ -42,6 +42,10 @@ struct Args {
     /// Dry-run, only lists "dirty" repositories, does not take any actions
     #[arg(short, long, default_value = "false")]
     dry_run: bool,
+
+    /// Additionally delete git .lock files
+    #[arg(short, long, default_value = "false")]
+    del_git_lock: bool,
 }
 
 fn main() -> Result<()> {
@@ -152,24 +156,33 @@ fn restore_dirty_repos(cmd_context: &CmdContext, dirty_repos: Vec<GitStatus>) ->
     dirty_repos.iter().try_for_each(|v| {
         println!("Restoring {}", v.path);
 
-        let command = format!("git clean -fd && git reset --hard {}", cmd_context.sync_branch_name);
-
-        let output = Command::new("sh")
-            .current_dir(&cmd_context.repo_root_folder.join(&v.path))
-            .arg("-c")
-            .arg(&command)
-            .output()
-            .map_err(Error::msg)?;
-
-        match output.status.success() {
-            true => Ok(()),
-            false => Err(anyhow!("Failed to execute {}: {:?}", command, output.status.code())),
+        if cmd_context.args.del_git_lock {
+            execute_shell_command(cmd_context, v, format!("rm .git/*.lock || true"))?;
         }
+
+        execute_shell_command(cmd_context, v, format!("git clean -fd"))?;
+        execute_shell_command(cmd_context, v, format!("git reset --hard {}", cmd_context.sync_branch_name))
     })?;
 
     println!("Restoring done");
 
     Ok(())
+}
+
+
+fn execute_shell_command(cmd_context: &CmdContext, v: &GitStatus, command: String) -> Result<()>  {
+    let output = Command::new("sh")
+        .current_dir(&cmd_context.repo_root_folder.join(&v.path))
+        .arg("-c")
+        .arg(&command)
+        .output()
+        .map_err(Error::msg)?;
+
+    match output.status.success() {
+        true => Ok(()),
+        false => Err(anyhow!("Failed to execute {} with exit code: {:?}:\n{:?}", command, output.status.code().unwrap_or(0), String::from_utf8_lossy(&output.stderr))),
+    }
+
 }
 
 fn default_status_options() -> StatusOptions {

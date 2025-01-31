@@ -77,6 +77,7 @@ Options:
   -g, --group <GROUP>    ignore projects which are not part of the given group(s)
   -v, --verbose          Verbose output, e.g. print local path before executing command
   -d, --dry-run          Dry-run, only lists "dirty" repositories, does not take any actions
-  -h, --help             Print help
-  -V, --version          Print version
-```
+  -d, --del-git-lock     Additionally delete git .lock files
+  -h, --help             Print help information
+  -V, --version          Print version information
+  ```
