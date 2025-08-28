@@ -2,12 +2,9 @@ use anyhow::{anyhow, bail, Result};
 use serde::Deserialize;
 use serde_xml_rs::from_reader;
 use std::env;
-use std::fs;
 use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::path::Path;
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 
 /// The repo-tool keeps a list of synced projects at
 /// .repo/project.list
@@ -27,29 +24,29 @@ pub fn select_projects(
     if let Some(groups) = filter_by_groups {
         let manifest = parse_manifest(&find_repo_folder()?.join("manifest.xml"))?;
         selected_projects = selected_projects
-            .drain(..)
+            .into_iter()
             .filter(|path| {
-                let project = manifest.find_project(path);
-                project.is_some() && project.unwrap().in_any_given_group(&groups)
+                manifest.find_project(path)
+                    .map_or(false, |project| project.in_any_given_group(&groups))
             })
             .collect();
     }
 
     if let Some(manifest_files) = filter_by_manifest_files {
         let repo_manifests_folder = find_repo_manifests_folder()?;
-        let mut aggregated_manifest = Manifest::empty();
-        for manifest_file in manifest_files {
-            let manifest = parse_manifest(&repo_manifests_folder.join(&manifest_file))?;
+        let mut aggregated_manifest = Manifest::default();
+        for manifest_file in &manifest_files {
+            let manifest = parse_manifest(&repo_manifests_folder.join(manifest_file))?;
             aggregated_manifest.append(&manifest);
         }
         selected_projects = selected_projects
-            .drain(..)
+            .into_iter()
             .filter(|p| aggregated_manifest.contains_project(p))
             .collect();
     }
 
     if include_manifest_repo {
-        selected_projects.push(".repo/manifests".to_string());
+        selected_projects.push(".repo/manifests".to_owned());
     }
 
     Ok(selected_projects)
@@ -66,10 +63,11 @@ fn lines_from_file(filename: impl AsRef<Path>) -> Result<Vec<String>> {
 /// the .repo folder, or an io::Error in case the file
 /// couldn't been found.
 pub fn find_project_list() -> Result<PathBuf> {
-    let find_project_list = find_repo_folder()?.join("project.list");
-    match find_project_list.is_file() {
-        true => Ok(find_project_list),
-        false => Err(anyhow!("no project.list in .repo found")),
+    let project_list_path = find_repo_folder()?.join("project.list");
+    if project_list_path.is_file() {
+        Ok(project_list_path)
+    } else {
+        Err(anyhow!("no project.list in .repo found"))
     }
 }
 
@@ -95,11 +93,9 @@ pub fn find_repo_manifests_folder() -> Result<PathBuf> {
 pub fn find_repo_root_folder() -> Result<PathBuf> {
     let cwd = env::current_dir()?;
     for parent in cwd.ancestors() {
-        for entry in fs::read_dir(&parent)? {
-            let entry = entry?;
-            if entry.path().is_dir() && entry.file_name() == ".repo" {
-                return Ok(parent.to_path_buf());
-            }
+        let repo_dir = parent.join(".repo");
+        if repo_dir.is_dir() {
+            return Ok(parent.to_path_buf());
         }
     }
     bail!("no .repo folder found")
@@ -111,8 +107,8 @@ pub fn parse_manifest(path: &Path) -> Result<Manifest> {
     let mut manifest: Manifest = from_reader(reader)?;
     let includes: Vec<String> = manifest.includes.iter().map(|i| i.name.clone()).collect();
     for include in &includes {
-        let path = find_repo_manifests_folder()?.join(include);
-        let child = parse(&path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
+        let include_path = find_repo_manifests_folder()?.join(include);
+        let child = parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
         manifest.append(&child);
     }
     Ok(manifest)
@@ -124,8 +120,8 @@ pub fn parse(path: &Path) -> Result<Manifest> {
     let mut manifest: Manifest = from_reader(reader)?;
     let includes: Vec<String> = manifest.includes.iter().map(|i| i.name.clone()).collect();
     for include in &includes {
-        let path = path.with_file_name(include);
-        let child = parse(&path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
+        let include_path = path.with_file_name(include);
+        let child = parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
         manifest.append(&child);
     }
     Ok(manifest)
@@ -140,17 +136,19 @@ pub struct Manifest {
     pub includes: Vec<Include>,
 }
 
-impl Manifest {
-    pub fn empty() -> Self {
-        Manifest {
-            projects: vec![],
-            includes: vec![],
+impl Default for Manifest {
+    fn default() -> Self {
+        Self {
+            projects: Vec::new(),
+            includes: Vec::new(),
         }
     }
+}
+
+impl Manifest {
 
     pub fn append(&mut self, manifest: &Manifest) {
-        let projects = &manifest.projects;
-        self.projects.extend(projects.iter().cloned());
+        self.projects.extend(manifest.projects.iter().cloned());
     }
 
     pub fn contains_project(&self, local_path: &str) -> bool {
@@ -172,16 +170,14 @@ pub struct Project {
 
 impl Project {
     pub fn in_any_given_group(&self, test_for_groups: &[String]) -> bool {
-        let project_groups: Vec<String> = self
-            .groups
+        self.groups
             .as_ref()
-            .unwrap_or(&String::new())
-            .split(&[',', ' '][..])
-            .map(|s| s.to_string())
-            .collect();
-        project_groups
-            .iter()
-            .any(|g| test_for_groups.iter().any(|other| g == other))
+            .map(|groups| {
+                groups
+                    .split([',', ' '])
+                    .any(|group| test_for_groups.iter().any(|test_group| group == test_group))
+            })
+            .unwrap_or(false)
     }
 }
 

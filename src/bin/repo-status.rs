@@ -1,6 +1,4 @@
-extern crate clap;
-
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
@@ -8,11 +6,7 @@ use git2::{Repository, StatusOptions};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects, find_repo_manifests_folder};
-use std::convert::TryInto;
-use std::{env};
-use std::process::{Command};
-use std::str;
-use std::time::Instant;
+use std::{convert::TryInto, env, process::Command, str, time::Instant};
 
 /// Check if repos managed by git-repo have local-only or uncommited changes,
 /// see https://github.com/elektronenhirn/repo-utils
@@ -39,7 +33,7 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if let Some(cwd) = args.cwd {
+    if let Some(cwd) = &args.cwd {
         env::set_current_dir(cwd)?;
     }
 
@@ -77,7 +71,11 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
 
             let statuses = repo.statuses(Some(&mut default_status_options()))?;
             
-            let last_repo_sync_tree = repo.find_branch(&sync_branch_name, git2::BranchType::Remote).map(|b| b.get().peel_to_tree()).with_context(|| format!("{:?}", path))??;
+            let last_repo_sync_tree = repo
+                .find_branch(&sync_branch_name, git2::BranchType::Remote)
+                .map_err(|e| anyhow!("Failed to find branch: {}", e))
+                .and_then(|b| b.get().peel_to_tree().map_err(Into::into))
+                .with_context(|| format!("{:?}", path))?;
             let head_tree = repo.head()?.peel_to_tree().with_context(|| format!("{:?}", path))?;
 
             let local_commits = repo.diff_tree_to_tree(
@@ -86,7 +84,7 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
                 None
             )?;
 
-            let _ = tx.send(GitStatus::new(path, !statuses.is_empty(),local_commits.deltas().len().try_into().unwrap()));
+            let _ = tx.send(GitStatus::new(path, !statuses.is_empty(), local_commits.deltas().len().try_into().unwrap()));
 
             Ok(())
         })
@@ -97,15 +95,15 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
     let mut repo_statuses: Vec<_> = rx.try_iter().collect();
     repo_statuses.sort();
 
-    repo_statuses.iter().for_each(|v| {
-        if v.uncomitted_changes {
+    for status in &repo_statuses {
+        if status.uncomitted_changes {
             dirty += 1;
         }
-        if v.local_commits > 0 {
+        if status.local_commits > 0 {
             local_commits += 1;
         }
-        v.print(verbose);
-    });
+        status.print(verbose);
+    }
 
     println!();
 
@@ -135,8 +133,8 @@ struct GitStatus {
 
 impl GitStatus {
     pub fn new(path: &str, dirty: bool, local_commits: i32) -> Self {
-        GitStatus {
-            path: path.to_string(),
+        Self {
+            path: path.to_owned(),
             uncomitted_changes: dirty,
             local_commits,
         }
@@ -150,7 +148,7 @@ impl GitStatus {
             println!("{}: {} local commits", self.path.red(), self.local_commits);
         } 
         
-        if verbose && !self.uncomitted_changes && self.local_commits == 0{
+        if verbose && !self.uncomitted_changes && self.local_commits == 0 {
             println!("{}: clean", self.path.green());
         }
     }
@@ -165,17 +163,17 @@ fn lookup_sync_branch_name() -> Result<String> {
 
     let manifests_folder = find_repo_manifests_folder()?;
 
-    Command::new("sh")
-            .current_dir(&manifests_folder)
-            .arg("-c")
-            .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
-            .output()
-            .map_or_else(|e| bail!(e), |o| {
-                match o.status.success() {
-                    true => Ok(String::from_utf8_lossy(&o.stdout).into_owned()),
-                    false => bail!(String::from_utf8_lossy(&o.stderr).into_owned())
-                }
-            })
-            .map(|s| "m/".to_string() + s.trim())
+    let output = Command::new("sh")
+        .current_dir(&manifests_folder)
+        .arg("-c")
+        .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
+        .output()?;
+    
+    if output.status.success() {
+        let branch_name = String::from_utf8_lossy(&output.stdout);
+        Ok(format!("m/{}", branch_name.trim()))
+    } else {
+        bail!(String::from_utf8_lossy(&output.stderr).into_owned())
+    }
 }
 

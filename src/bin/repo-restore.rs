@@ -1,6 +1,4 @@
-extern crate clap;
-
-use anyhow::{bail, Context, Error, Result, Ok, anyhow};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
@@ -11,12 +9,14 @@ use rayon::prelude::*;
 use repo_utils::repo_project_selector::{
     find_repo_manifests_folder, find_repo_root_folder, select_projects,
 };
-use std::convert::TryInto;
-use std::env;
-use std::path::PathBuf;
-use std::process::{Command};
-use std::str;
-use std::time::Instant;
+use std::{
+    convert::TryInto,
+    env,
+    path::PathBuf,
+    process::Command,
+    str,
+    time::Instant,
+};
 
 /// Restore repos managed by git-repo to the last "repo sync" state,
 /// see https://github.com/elektronenhirn/repo-utils
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
 
     let dirty_repos = scan_for_dirty_repos(&cmd_context)?;
 
-    if cmd_context.args.dry_run || dirty_repos.is_empty(){
+    if cmd_context.args.dry_run || dirty_repos.is_empty() {
         println!("Nothing to be done, bye");
         return Ok(());
     }
@@ -105,8 +105,9 @@ fn scan_for_dirty_repos(cmd_context: &CmdContext) -> Result<Vec<GitStatus>> {
 
             let last_repo_sync_tree = repo
                 .find_branch(&cmd_context.sync_branch_name, git2::BranchType::Remote)
-                .map(|b| b.get().peel_to_tree())
-                .with_context(|| format!("{:?}", path))??;
+                .map_err(|e| anyhow!("Failed to find branch: {}", e))
+                .and_then(|b| b.get().peel_to_tree().map_err(Into::into))
+                .with_context(|| format!("{:?}", path))?;
             let head_tree = repo
                 .head()?
                 .peel_to_tree()

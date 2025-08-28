@@ -1,5 +1,3 @@
-extern crate clap;
-
 use anyhow::{anyhow, bail, Error, Result};
 use clap::Parser;
 use colored::*;
@@ -7,12 +5,9 @@ use crossbeam::channel::unbounded;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects};
-use std::env;
-use std::fmt;
-use std::io;
+use std::{env, fmt, io, str};
 use std::io::Write;
 use std::process::{Command, Output};
-use std::str;
 use std::time::Instant;
 
 /// Execute commands on git repositories managed by repo,
@@ -50,7 +45,7 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if let Some(cwd) = args.cwd {
+    if let Some(cwd) = &args.cwd {
         env::set_current_dir(cwd)?;
     }
 
@@ -64,7 +59,7 @@ fn main() -> Result<()> {
 
     forall(
         list_of_projects,
-        args.command.join(" "),
+        &args.command.join(" "),
         args.fail_fast,
         args.print_project_path,
     )
@@ -72,7 +67,7 @@ fn main() -> Result<()> {
 
 fn forall(
     list_of_projects: Vec<String>,
-    command: String,
+    command: &str,
     fail_fast: bool,
     print_project_path: bool,
 ) -> Result<()> {
@@ -94,17 +89,18 @@ fn forall(
             let output = CommandOutput::new(
                 path,
                 Command::new("sh")
-                    .current_dir(&repo_root_folder.join(path))
+                    .current_dir(repo_root_folder.join(path))
                     .arg("-c")
-                    .arg(&command)
+                    .arg(command)
                     .env("REPO_PATH", path)
                     .output()
                     .map_err(Error::msg),
             );
 
-            let result: Result<()> = match fail_fast && !&output.success() {
-                true => Err(anyhow!("")),
-                false => Ok(()),
+            let result: Result<()> = if fail_fast && !output.success() {
+                Err(anyhow!(""))
+            } else {
+                Ok(())
             };
 
             let _ = tx.send(output);
@@ -114,34 +110,34 @@ fn forall(
 
     let (mut succeeded, mut failed) = (0, 0);
 
-    rx.try_iter().for_each(|output| {
-        match output.success() {
-            true => succeeded += 1,
-            false => failed += 1,
+    for output in rx.try_iter() {
+        if output.success() {
+            succeeded += 1;
+        } else {
+            failed += 1;
         }
         output.print(print_project_path);
-    });
+    }
 
     println!();
 
-    match failed {
-        0 => {
-            println!(
-                "Finished in {}s: {}/{} executions succeeded, {} failed",
-                timestamp_before_exec.elapsed().as_secs(),
-                succeeded,
-                list_of_projects.len(),
-                failed
-            );
-            Ok(())
-        }
-        _ => Err(anyhow!(
+    if failed == 0 {
+        println!(
+            "Finished in {}s: {}/{} executions succeeded, {} failed",
+            timestamp_before_exec.elapsed().as_secs(),
+            succeeded,
+            list_of_projects.len(),
+            failed
+        );
+        Ok(())
+    } else {
+        Err(anyhow!(
             "Finished in {}s: {} executions failed, {}/{} succeeded",
             timestamp_before_exec.elapsed().as_secs(),
             failed,
             succeeded,
             list_of_projects.len()
-        )),
+        ))
     }
 }
 
@@ -152,8 +148,8 @@ struct CommandOutput {
 
 impl CommandOutput {
     pub fn new(path: &str, output: Result<Output>) -> Self {
-        CommandOutput {
-            path: path.to_string(),
+        Self {
+            path: path.to_owned(),
             output,
         }
     }
