@@ -111,7 +111,7 @@ impl MainView {
             .with_required_size(|_model, req| cursive::Vec2::new(req.x, 1))
     }
 
-    pub fn update_commit_bar(self: &mut Self, index: usize, size: usize, entry: &RepoCommit) {
+    pub fn update_commit_bar(&mut self, index: usize, size: usize, entry: &RepoCommit) {
         *self.commit_bar_model.lock().unwrap() = format!(
             "Commit {} of {} - {}",
             index + 1,
@@ -120,7 +120,7 @@ impl MainView {
         );
     }
 
-    pub fn show_error(self: &mut Self, context: &str, error: &std::io::Error) {
+    pub fn show_error(&mut self, context: &str, error: &std::io::Error) {
         *self.commit_bar_model.lock().unwrap() = format!("{}: {}", context, error);
     }
 }

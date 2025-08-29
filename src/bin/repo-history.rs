@@ -2,9 +2,8 @@
 use anyhow::Result;
 use repo_utils::repo_history::model::{MultiRepoHistory, Repo, RevWalkStrategy};
 use repo_utils::repo_history::model;
-use std::env;
+use std::{env, io};
 use std::fs::File;
-use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
@@ -76,7 +75,7 @@ fn main() -> Result<(), String> {
         args.include_manifest,
         args.report_file_path.as_ref().and_then(|v| v.first().map(|p| p.to_str().unwrap())),
     )
-    .or_else(|e| Err(e.to_string()))
+    .map_err(|e| e.to_string())
 }
 
 fn do_main(
@@ -107,7 +106,7 @@ fn do_main(
     };
     
     let history = MultiRepoHistory::from(repos, &classifier, &revwalk_enum)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
     //TUI or report?
     match report_file_path {
@@ -123,20 +122,26 @@ fn do_main(
 }
 
 fn repos_from(
-    project_file: &std::fs::File,
+    project_file: &File,
     include_manifest: bool,
 ) -> Result<Vec<Arc<Repo>>, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
     for project in BufReader::new(project_file).lines() {
-        let rel_path = project.expect("project.list read error");
-        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
+        let rel_path = project?;
+        repos.push(Arc::new(Repo::from(
+            base_folder.join(&rel_path),
+            rel_path,
+        )));
     }
 
     if include_manifest {
-        let rel_path = String::from(".repo/manifests");
-        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
+        let rel_path = ".repo/manifests".to_owned();
+        repos.push(Arc::new(Repo::from(
+            base_folder.join(&rel_path),
+            rel_path,
+        )));
     }
 
     Ok(repos)

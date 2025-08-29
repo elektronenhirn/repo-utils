@@ -10,8 +10,8 @@ pub struct SeperatorView {
 }
 
 impl SeperatorView {
-    pub fn vertical() -> SeperatorView {
-        SeperatorView {
+    pub fn vertical() -> Self {
+        Self {
             orientation: Orientation::Vertical,
         }
     }

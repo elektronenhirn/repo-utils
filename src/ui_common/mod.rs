@@ -6,4 +6,3 @@ pub mod styles;
 pub use self::table_view::TableView;
 pub use self::list_view::ListView;
 pub use self::seperator_view::SeperatorView;
-pub use self::styles::*;

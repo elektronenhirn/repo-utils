@@ -29,8 +29,8 @@ impl MultiRepoHistory {
 
         let mut commits: Vec<RepoCommit> = repos
             .par_iter()
-            .map(move |repo| {
-                let progress_bar = &progress_bars[rayon::current_thread_index()?];
+            .flat_map(move |repo| {
+                let progress_bar = &progress_bars[rayon::current_thread_index().unwrap_or(0)];
                 progress_bar.set_message(format!("Scanning {}", repo.rel_path));
 
                 let progress_error = |msg: &str, error: &dyn std::error::Error| {
@@ -44,32 +44,41 @@ impl MultiRepoHistory {
                     progress_bar.set_message("Idle");
                 };
 
-                let git_repo = Repository::open(&repo.abs_path)
-                    .map_err(|e| progress_error("Failed to open", &e))
-                    .ok()?;
+                let git_repo = match Repository::open(&repo.abs_path) {
+                    Ok(repo) => repo,
+                    Err(e) => {
+                        progress_error("Failed to open", &e);
+                        return Vec::new();
+                    }
+                };
 
-                let mut revwalk = git_repo
-                    .revwalk()
-                    .map_err(|e| progress_error("Failed create revwalk", &e))
-                    .ok()?;
+                let mut revwalk = match git_repo.revwalk() {
+                    Ok(revwalk) => revwalk,
+                    Err(e) => {
+                        progress_error("Failed create revwalk", &e);
+                        return Vec::new();
+                    }
+                };
 
-                revwalk
-                    .push_head()
-                    .map_err(|e| progress_error("Failed query history", &e))
-                    .ok()?;
-                if rewalk_strategy == &RevWalkStrategy::FirstParent {
-                    revwalk.simplify_first_parent().ok()?;
+                if let Err(e) = revwalk.push_head() {
+                    progress_error("Failed query history", &e);
+                    return Vec::new();
                 }
-                revwalk.set_sorting(git2::Sort::TIME).ok()?;
+                
+                if rewalk_strategy == &RevWalkStrategy::FirstParent {
+                    let _ = revwalk.simplify_first_parent();
+                }
+                let _ = revwalk.set_sorting(git2::Sort::TIME);
 
                 let mut commits = Vec::new();
                 for commit_id in revwalk {
-                    let commit = commit_id
-                        .and_then(|commit_id| git_repo.find_commit(commit_id))
-                        .map_err(|_e| {
-                            missing_commits.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-                        })
-                        .ok()?;
+                    let commit = match commit_id.and_then(|commit_id| git_repo.find_commit(commit_id)) {
+                        Ok(commit) => commit,
+                        Err(_e) => {
+                            missing_commits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            continue;
+                        }
+                    };
                     let (include, abort) = classifier.classify(&commit);
                     if include {
                         commits.push(RepoCommit::from(repo.clone(), &commit));
@@ -79,15 +88,9 @@ impl MultiRepoHistory {
                     }
                 }
                 progress_bar.set_message("Idle");
-                if commits.is_empty() {
-                    None
-                } else {
-                    Some(commits)
-                }
+                commits
             })
             .progress_with(overall_progress)
-            .filter_map(|x| x)
-            .flatten()
             .collect();
 
         commits.sort_unstable_by(|a, b| a.commit_time.cmp(&b.commit_time).reverse());
@@ -144,9 +147,13 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn from(abs_path: PathBuf, rel_path: String) -> Repo {
-        let description = abs_path.file_name().unwrap().to_str().unwrap().into();
-        Repo {
+    pub fn from(abs_path: PathBuf, rel_path: String) -> Self {
+        let description = abs_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&rel_path)
+            .to_owned();
+        Self {
             abs_path,
             rel_path,
             description,
@@ -168,15 +175,15 @@ pub struct RepoCommit {
 }
 
 impl RepoCommit {
-    pub fn from(repo: Arc<Repo>, commit: &Commit) -> RepoCommit {
-        RepoCommit {
+    pub fn from(repo: Arc<Repo>, commit: &Commit) -> Self {
+        Self {
             repo,
             commit_time: commit.time(),
-            summary: commit.summary().unwrap_or("None").into(),
-            author: commit.author().name().unwrap_or("None").into(),
-            committer: commit.committer().name().unwrap_or("None").into(),
+            summary: commit.summary().unwrap_or("None").to_owned(),
+            author: commit.author().name().unwrap_or("None").to_owned(),
+            committer: commit.committer().name().unwrap_or("None").to_owned(),
             commit_id: commit.id(),
-            message: commit.message().unwrap_or("").to_string(),
+            message: commit.message().unwrap_or("").to_owned(),
         }
     }
 
@@ -217,8 +224,8 @@ pub struct Classifier {
 }
 
 impl Classifier {
-    pub fn new(age: u32, author: Option<&str>, message: Option<&str>) -> Classifier {
-        Classifier {
+    pub fn new(age: u32, author: Option<&str>, message: Option<&str>) -> Self {
+        Self {
             age,
             author: author.map(str::to_lowercase),
             message: message.map(str::to_lowercase),
@@ -234,13 +241,13 @@ impl Classifier {
         let (mut include, abort) = (include, !include);
 
         if let Some(ref message) = self.message {
-            let cm = commit.message().unwrap_or("").to_ascii_lowercase();
-            include &= cm.contains(message);
+            let commit_message = commit.message().unwrap_or("").to_ascii_lowercase();
+            include &= commit_message.contains(message);
         }
 
         if let Some(ref author) = self.author {
-            let ca = commit.author().name().unwrap_or("").to_ascii_lowercase();
-            include &= ca.contains(author);
+            let commit_author = commit.author().name().unwrap_or("").to_ascii_lowercase();
+            include &= commit_author.contains(author);
         }
 
         (include, abort)

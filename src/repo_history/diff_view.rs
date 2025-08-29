@@ -12,13 +12,13 @@ pub struct DiffView {
 
 impl DiffView {
     pub fn empty() -> Self {
-        DiffView {
+        Self {
             list_view: ListView::new(),
             commit: None,
         }
     }
 
-    pub fn set_commit(self: &mut Self, entry: &RepoCommit) {
+    pub fn set_commit(&mut self, entry: &RepoCommit) {
         self.commit = Some(entry.clone());
 
         self.list_view = ListView::new();
@@ -79,24 +79,24 @@ impl DiffView {
 
     fn color_of(line: &str) -> ColorStyle {
         let color_coding = [
-            ("commit ", *BLUE),
-            ("Author: ", *LIGHT_BLUE),
-            ("AuthorDate: ", *YELLOW),
-            ("Commit: ", *MAGENTA),
-            ("CommitDate: ", *YELLOW),
-            ("---", *YELLOW),
-            ("+++", *YELLOW),
-            ("new ", *YELLOW),
-            ("rename", *YELLOW),
-            ("diff", *YELLOW),
-            ("@", *MAGENTA),
-            ("+", *GREEN),
-            ("-", *RED),
+            ("commit ", &*BLUE),
+            ("Author: ", &*LIGHT_BLUE),
+            ("AuthorDate: ", &*YELLOW),
+            ("Commit: ", &*MAGENTA),
+            ("CommitDate: ", &*YELLOW),
+            ("---", &*YELLOW),
+            ("+++", &*YELLOW),
+            ("new ", &*YELLOW),
+            ("rename", &*YELLOW),
+            ("diff", &*YELLOW),
+            ("@", &*MAGENTA),
+            ("+", &*GREEN),
+            ("-", &*RED),
         ];
 
         for cc in &color_coding {
             if line.starts_with(cc.0) {
-                return cc.1;
+                return *cc.1;
             }
         }
         return *WHITE;
