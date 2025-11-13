@@ -18,7 +18,7 @@ impl SeperatorView {
 }
 impl View for SeperatorView {
     fn draw(&self, printer: &Printer<'_, '_>) {
-        let style = ColorStyle::new(Color::Dark(BaseColor::White), Color::Dark(BaseColor::Blue));
+        let style = ColorStyle::new(Color::Dark(BaseColor::White), Color::Dark(BaseColor::Black));
         printer.with_style(style, |p| match self.orientation {
             Orientation::Vertical => {
                 p.print_vline(self.orientation.make_vec(0, 0), printer.size.y, "│")

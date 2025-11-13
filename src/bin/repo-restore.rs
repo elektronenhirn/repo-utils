@@ -28,7 +28,7 @@ struct Args {
     cwd: Option<std::path::PathBuf>,
 
     /// ignore projects which are not defined in the given manifest file(s)
-    #[arg(short, long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
+    #[arg(short = 'x', long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     manifest: Option<Vec<std::path::PathBuf>>,
 
     /// ignore projects which are not part of the given group(s)
@@ -44,7 +44,7 @@ struct Args {
     dry_run: bool,
 
     /// Additionally delete git .lock files
-    #[arg(short, long, default_value = "false")]
+    #[arg(short = 'l', long, default_value = "false")]
     del_git_lock: bool,
 }
 
@@ -161,7 +161,7 @@ fn restore_dirty_repos(cmd_context: &CmdContext, dirty_repos: Vec<GitStatus>) ->
             execute_shell_command(cmd_context, v, format!("rm .git/*.lock || true"))?;
         }
 
-        execute_shell_command(cmd_context, v, format!("git clean -fd"))?;
+        execute_shell_command(cmd_context, v, format!("git clean -ffd"))?;
         execute_shell_command(cmd_context, v, format!("git reset --hard {}", cmd_context.sync_branch_name))
     })?;
 

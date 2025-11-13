@@ -25,7 +25,7 @@ struct Args {
     cwd: Option<std::path::PathBuf>,
 
     /// ignore projects which are not defined in the given manifest file(s)
-    #[arg(short, long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
+    #[arg(short = 'x', long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     manifest: Option<Vec<std::path::PathBuf>>,
 
     /// ignore projects which are not part of the given group(s)
@@ -53,7 +53,7 @@ struct Args {
     include_manifest: bool,
 
     /// writes a report to a file given by <path> - supported formats: .csv, .ods, .xlsx
-    #[arg(short, long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
+    #[arg(short = 'p', long, value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     report_file_path: Option<Vec<std::path::PathBuf>>,
 }
 

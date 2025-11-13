@@ -19,8 +19,8 @@ fn build_status_bar(
     Canvas::new((commits, repos, missing_commits, size))
         .with_draw(|(commits, repos, missing_commits, size), printer| {
             let style = ColorStyle::new(
+                Color::Dark(BaseColor::White),
                 Color::Dark(BaseColor::Black),
-                Color::Light(BaseColor::Black),
             );
 
             printer.with_style(style, |p| {
@@ -50,7 +50,7 @@ fn update(siv: &mut Cursive, index: usize, commits: usize, entry: &RepoCommit) {
 
 pub fn show(model: MultiRepoHistory, config: Config) {
     let mut siv = Cursive::default();
-    // TODO: Load theme from style.toml if needed
+    siv.load_toml(include_str!("../assets/style.toml")).unwrap();
 
     //Postpone the initialization of the UI until cursive is running so we can
     // query the terminal dimensions with screen_size()
