@@ -1,11 +1,13 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
 use git2::{Repository, StatusOptions};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects, find_repo_manifests_folder};
+use repo_utils::repo_project_selector::{
+    find_repo_manifests_folder, find_repo_root_folder, select_projects,
+};
 use std::{convert::TryInto, env, process::Command, str, time::Instant};
 
 /// Check if repos managed by git-repo have local-only or uncommited changes,
@@ -59,32 +61,36 @@ fn status(list_of_projects: Vec<String>, verbose: bool) -> Result<()> {
 
     let repo_root_folder = find_repo_root_folder()?;
 
-    let _ = list_of_projects
+    list_of_projects
         .par_iter()
         .progress_with(progress_bar)
         .try_for_each(|path| {
-            let repo = Repository::open(repo_root_folder.join(&path))
+            let repo = Repository::open(repo_root_folder.join(path))
                 .with_context(|| format!("Failed to open git repo at {:?}", path))?;
             if repo.is_bare() {
                 bail!("cannot report status on bare repository");
             }
 
             let statuses = repo.statuses(Some(&mut default_status_options()))?;
-            
+
             let last_repo_sync_tree = repo
                 .find_branch(&sync_branch_name, git2::BranchType::Remote)
                 .map_err(|e| anyhow!("Failed to find branch: {}", e))
                 .and_then(|b| b.get().peel_to_tree().map_err(Into::into))
                 .with_context(|| format!("{:?}", path))?;
-            let head_tree = repo.head()?.peel_to_tree().with_context(|| format!("{:?}", path))?;
+            let head_tree = repo
+                .head()?
+                .peel_to_tree()
+                .with_context(|| format!("{:?}", path))?;
 
-            let local_commits = repo.diff_tree_to_tree(
-                Some(&last_repo_sync_tree),
-                Some(&head_tree),
-                None
-            )?;
+            let local_commits =
+                repo.diff_tree_to_tree(Some(&last_repo_sync_tree), Some(&head_tree), None)?;
 
-            let _ = tx.send(GitStatus::new(path, !statuses.is_empty(), local_commits.deltas().len().try_into().unwrap()));
+            let _ = tx.send(GitStatus::new(
+                path,
+                !statuses.is_empty(),
+                local_commits.deltas().len().try_into().unwrap(),
+            ));
 
             Ok(())
         })
@@ -128,7 +134,7 @@ fn default_status_options() -> StatusOptions {
 struct GitStatus {
     pub path: String,
     pub uncomitted_changes: bool,
-    pub local_commits: i32
+    pub local_commits: i32,
 }
 
 impl GitStatus {
@@ -146,8 +152,8 @@ impl GitStatus {
         }
         if self.local_commits > 0 {
             println!("{}: {} local commits", self.path.red(), self.local_commits);
-        } 
-        
+        }
+
         if verbose && !self.uncomitted_changes && self.local_commits == 0 {
             println!("{}: clean", self.path.green());
         }
@@ -168,7 +174,7 @@ fn lookup_sync_branch_name() -> Result<String> {
         .arg("-c")
         .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
         .output()?;
-    
+
     if output.status.success() {
         let branch_name = String::from_utf8_lossy(&output.stdout);
         Ok(format!("m/{}", branch_name.trim()))
@@ -176,4 +182,3 @@ fn lookup_sync_branch_name() -> Result<String> {
         bail!(String::from_utf8_lossy(&output.stderr).into_owned())
     }
 }
-

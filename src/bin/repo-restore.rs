@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{Context, Error, Result, anyhow, bail};
 use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
@@ -9,14 +9,7 @@ use rayon::prelude::*;
 use repo_utils::repo_project_selector::{
     find_repo_manifests_folder, find_repo_root_folder, select_projects,
 };
-use std::{
-    convert::TryInto,
-    env,
-    path::PathBuf,
-    process::Command,
-    str,
-    time::Instant,
-};
+use std::{convert::TryInto, env, path::PathBuf, process::Command, str, time::Instant};
 
 /// Restore repos managed by git-repo to the last "repo sync" state,
 /// see https://github.com/elektronenhirn/repo-utils
@@ -91,11 +84,12 @@ fn scan_for_dirty_repos(cmd_context: &CmdContext) -> Result<Vec<GitStatus>> {
             .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7}")?,
     );
 
-    let _ = cmd_context.list_of_projects
+    cmd_context
+        .list_of_projects
         .par_iter()
         .progress_with(progress_bar)
         .try_for_each(|path| {
-            let repo = Repository::open(cmd_context.repo_root_folder.join(&path))
+            let repo = Repository::open(cmd_context.repo_root_folder.join(path))
                 .with_context(|| format!("Failed to open git repo at {:?}", path))?;
             if repo.is_bare() {
                 bail!("cannot report status on bare repository");
@@ -129,8 +123,8 @@ fn scan_for_dirty_repos(cmd_context: &CmdContext) -> Result<Vec<GitStatus>> {
     let mut repo_statuses: Vec<_> = rx.try_iter().collect();
     repo_statuses.sort();
 
-//    let repos_with_uncommited_changes = repo_statuses.iter().fold(0, |sum, gs| if gs.uncomitted_changes {sum + 1} else {sum} );
-//    let repos_with_local_commits = repo_statuses.iter().fold(0, |sum, gs| if gs.local_deltas > 0 {sum + 1} else {sum} );
+    //    let repos_with_uncommited_changes = repo_statuses.iter().fold(0, |sum, gs| if gs.uncomitted_changes {sum + 1} else {sum} );
+    //    let repos_with_local_commits = repo_statuses.iter().fold(0, |sum, gs| if gs.local_deltas > 0 {sum + 1} else {sum} );
 
     let mut dirty_repos: Vec<GitStatus> = vec![];
 
@@ -158,11 +152,15 @@ fn restore_dirty_repos(cmd_context: &CmdContext, dirty_repos: Vec<GitStatus>) ->
         println!("Restoring {}", v.path);
 
         if cmd_context.args.del_git_lock {
-            execute_shell_command(cmd_context, v, format!("rm .git/*.lock || true"))?;
+            execute_shell_command(cmd_context, v, "rm .git/*.lock || true".to_string())?;
         }
 
-        execute_shell_command(cmd_context, v, format!("git clean -ffd"))?;
-        execute_shell_command(cmd_context, v, format!("git reset --hard {}", cmd_context.sync_branch_name))
+        execute_shell_command(cmd_context, v, "git clean -ffd".to_string())?;
+        execute_shell_command(
+            cmd_context,
+            v,
+            format!("git reset --hard {}", cmd_context.sync_branch_name),
+        )
     })?;
 
     println!("Restoring done");
@@ -170,10 +168,9 @@ fn restore_dirty_repos(cmd_context: &CmdContext, dirty_repos: Vec<GitStatus>) ->
     Ok(())
 }
 
-
-fn execute_shell_command(cmd_context: &CmdContext, v: &GitStatus, command: String) -> Result<()>  {
+fn execute_shell_command(cmd_context: &CmdContext, v: &GitStatus, command: String) -> Result<()> {
     let output = Command::new("sh")
-        .current_dir(&cmd_context.repo_root_folder.join(&v.path))
+        .current_dir(cmd_context.repo_root_folder.join(&v.path))
         .arg("-c")
         .arg(&command)
         .output()
@@ -181,9 +178,13 @@ fn execute_shell_command(cmd_context: &CmdContext, v: &GitStatus, command: Strin
 
     match output.status.success() {
         true => Ok(()),
-        false => Err(anyhow!("Failed to execute {} with exit code: {:?}:\n{:?}", command, output.status.code().unwrap_or(0), String::from_utf8_lossy(&output.stderr))),
+        false => Err(anyhow!(
+            "Failed to execute {} with exit code: {:?}:\n{:?}",
+            command,
+            output.status.code().unwrap_or(0),
+            String::from_utf8_lossy(&output.stderr)
+        )),
     }
-
 }
 
 fn default_status_options() -> StatusOptions {
@@ -233,11 +234,15 @@ struct CmdContext {
 
 impl CmdContext {
     pub fn from(args: Args, list_of_projects: Vec<String>) -> Result<CmdContext> {
-
         let sync_branch_name = lookup_sync_branch_name()?;
         let repo_root_folder: std::path::PathBuf = find_repo_root_folder()?;
 
-        Ok(CmdContext{sync_branch_name, repo_root_folder, args, list_of_projects})
+        Ok(CmdContext {
+            sync_branch_name,
+            repo_root_folder,
+            args,
+            list_of_projects,
+        })
     }
 }
 // The repo tool maintains a branch tracking the last synced state

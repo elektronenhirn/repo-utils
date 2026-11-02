@@ -1,11 +1,11 @@
 use crate::repo_history::model::{MultiRepoHistory, RepoCommit};
 use crate::ui_common::styles::{GREEN, RED, WHITE};
 use crate::ui_common::table_view::{TableView, TableViewItem};
+use cursive::Cursive;
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::*;
 use cursive::view::ViewWrapper;
 use cursive::views::{Canvas, LinearLayout, ViewRef};
-use cursive::Cursive;
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -112,12 +112,8 @@ impl MainView {
     }
 
     pub fn update_commit_bar(&mut self, index: usize, size: usize, entry: &RepoCommit) {
-        *self.commit_bar_model.lock().unwrap() = format!(
-            "Commit {} of {} - {}",
-            index + 1,
-            size,
-            entry.repo.rel_path
-        );
+        *self.commit_bar_model.lock().unwrap() =
+            format!("Commit {} of {} - {}", index + 1, size, entry.repo.rel_path);
     }
 
     pub fn show_error(&mut self, context: &str, error: &std::io::Error) {

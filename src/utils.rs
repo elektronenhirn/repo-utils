@@ -15,10 +15,7 @@ pub fn find_project_file() -> Result<PathBuf, io::Error> {
     if project_file.is_file() {
         Ok(project_file)
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "no project.list in .repo found",
-        ))
+        Err(io::Error::other("no project.list in .repo found"))
     }
 }
 
@@ -36,24 +33,24 @@ pub fn find_repo_folder() -> Result<PathBuf, io::Error> {
 pub fn find_repo_base_folder() -> Result<PathBuf, io::Error> {
     let cwd = env::current_dir()?;
     for parent in cwd.ancestors() {
-        for entry in fs::read_dir(&parent)? {
+        for entry in fs::read_dir(parent)? {
             let entry = entry?;
             if entry.path().is_dir() && entry.file_name() == ".repo" {
                 return Ok(parent.to_path_buf());
             }
         }
     }
-    Err(io::Error::new(
-        io::ErrorKind::Other,
-        "no .repo folder found",
-    ))
+    Err(io::Error::other("no .repo folder found"))
 }
 
 /// converts a git2 time datastructure into its
 /// rust-idiomatic equivalent
 pub fn as_datetime(git_time: &Time) -> DateTime<FixedOffset> {
     let offset_in_secs = git_time.offset_minutes() * 60;
-    FixedOffset::east_opt(offset_in_secs).unwrap().timestamp_opt(git_time.seconds(), 0).unwrap()
+    FixedOffset::east_opt(offset_in_secs)
+        .unwrap()
+        .timestamp_opt(git_time.seconds(), 0)
+        .unwrap()
 }
 
 /// converts a git2 time datastructure into its

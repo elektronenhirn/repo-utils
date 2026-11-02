@@ -1,8 +1,8 @@
+use cursive::Printer;
 use cursive::direction::Orientation;
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::View;
 use cursive::vec::Vec2;
-use cursive::Printer;
 
 /// View to display a line to visually seperate other views
 pub struct SeperatorView {

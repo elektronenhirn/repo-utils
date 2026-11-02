@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use serde::Deserialize;
 use serde_xml_rs::from_reader;
 use std::env;
@@ -23,13 +23,11 @@ pub fn select_projects(
 
     if let Some(groups) = filter_by_groups {
         let manifest = parse_manifest(&find_repo_folder()?.join("manifest.xml"))?;
-        selected_projects = selected_projects
-            .into_iter()
-            .filter(|path| {
-                manifest.find_project(path)
-                    .map_or(false, |project| project.in_any_given_group(&groups))
-            })
-            .collect();
+        selected_projects.retain(|path| {
+            manifest
+                .find_project(path)
+                .is_some_and(|project| project.in_any_given_group(&groups))
+        });
     }
 
     if let Some(manifest_files) = filter_by_manifest_files {
@@ -39,10 +37,7 @@ pub fn select_projects(
             let manifest = parse_manifest(&repo_manifests_folder.join(manifest_file))?;
             aggregated_manifest.append(&manifest);
         }
-        selected_projects = selected_projects
-            .into_iter()
-            .filter(|p| aggregated_manifest.contains_project(p))
-            .collect();
+        selected_projects.retain(|p| aggregated_manifest.contains_project(p));
     }
 
     if include_manifest_repo {
@@ -108,7 +103,8 @@ pub fn parse_manifest(path: &Path) -> Result<Manifest> {
     let includes: Vec<String> = manifest.includes.iter().map(|i| i.name.clone()).collect();
     for include in &includes {
         let include_path = find_repo_manifests_folder()?.join(include);
-        let child = parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
+        let child =
+            parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
         manifest.append(&child);
     }
     Ok(manifest)
@@ -121,14 +117,15 @@ pub fn parse(path: &Path) -> Result<Manifest> {
     let includes: Vec<String> = manifest.includes.iter().map(|i| i.name.clone()).collect();
     for include in &includes {
         let include_path = path.with_file_name(include);
-        let child = parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
+        let child =
+            parse(&include_path).map_err(|e| anyhow!("Failed to parse {}: {}", include, e))?;
         manifest.append(&child);
     }
     Ok(manifest)
 }
 
 /// OO representation of a repo-tool's manifest xml element
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Manifest {
     #[serde(rename = "project", default)]
     pub projects: Vec<Project>,
@@ -136,17 +133,7 @@ pub struct Manifest {
     pub includes: Vec<Include>,
 }
 
-impl Default for Manifest {
-    fn default() -> Self {
-        Self {
-            projects: Vec::new(),
-            includes: Vec::new(),
-        }
-    }
-}
-
 impl Manifest {
-
     pub fn append(&mut self, manifest: &Manifest) {
         self.projects.extend(manifest.projects.iter().cloned());
     }

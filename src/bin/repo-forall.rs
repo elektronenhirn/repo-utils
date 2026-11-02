@@ -1,14 +1,14 @@
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{Error, Result, anyhow, bail};
 use clap::Parser;
 use colored::*;
 use crossbeam::channel::unbounded;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{find_repo_root_folder, select_projects};
-use std::{env, fmt, io, str};
 use std::io::Write;
 use std::process::{Command, Output};
 use std::time::Instant;
+use std::{env, fmt, io, str};
 
 /// Execute commands on git repositories managed by repo,
 /// see https://github.com/elektronenhirn/repo-utils

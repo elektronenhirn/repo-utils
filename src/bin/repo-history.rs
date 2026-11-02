@@ -1,15 +1,14 @@
-
 use anyhow::Result;
-use repo_utils::repo_history::model::{MultiRepoHistory, Repo, RevWalkStrategy};
+use clap::Parser;
 use repo_utils::repo_history::model;
-use std::{env, io};
+use repo_utils::repo_history::model::{MultiRepoHistory, Repo, RevWalkStrategy};
+use repo_utils::repo_history::ui;
+use repo_utils::utils::{find_project_file, find_repo_base_folder};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
-use repo_utils::utils::{find_project_file, find_repo_base_folder};
-use repo_utils::repo_history::ui;
-use clap::Parser;
+use std::{env, io};
 
 // Sweet Spot? Tests on a 36 core INTEL Xeon showed that parsing becomes
 // slower again if more than 18 threads are used
@@ -57,15 +56,13 @@ struct Args {
     report_file_path: Option<Vec<std::path::PathBuf>>,
 }
 
-
-
 fn main() -> Result<(), String> {
     let args = Args::parse();
 
     let classifier = model::Classifier::new(
         args.days.unwrap_or(365),
         args.author.as_deref(),
-        args.message.as_deref()
+        args.message.as_deref(),
     );
 
     do_main(
@@ -73,7 +70,9 @@ fn main() -> Result<(), String> {
         &args.revwalk_strategy,
         args.cwd.as_deref(),
         args.include_manifest,
-        args.report_file_path.as_ref().and_then(|v| v.first().map(|p| p.to_str().unwrap())),
+        args.report_file_path
+            .as_ref()
+            .and_then(|v| v.first().map(|p| p.to_str().unwrap())),
     )
     .map_err(|e| e.to_string())
 }
@@ -92,7 +91,10 @@ fn do_main(
     }
 
     rayon::ThreadPoolBuilder::new()
-        .num_threads(std::cmp::min(num_cpus::get(), MAX_NUMBER_OF_THREADS))
+        .num_threads(std::cmp::min(
+            std::thread::available_parallelism().map_or(1, |n| n.get()),
+            MAX_NUMBER_OF_THREADS,
+        ))
         .build_global()
         .unwrap();
 
@@ -104,9 +106,9 @@ fn do_main(
         "all" => RevWalkStrategy::AllParents,
         _ => RevWalkStrategy::FirstParent,
     };
-    
-    let history = MultiRepoHistory::from(repos, &classifier, &revwalk_enum)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+    let history = MultiRepoHistory::from(repos, classifier, &revwalk_enum)
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     //TUI or report?
     match report_file_path {
@@ -121,27 +123,18 @@ fn do_main(
     Ok(())
 }
 
-fn repos_from(
-    project_file: &File,
-    include_manifest: bool,
-) -> Result<Vec<Arc<Repo>>, io::Error> {
+fn repos_from(project_file: &File, include_manifest: bool) -> Result<Vec<Arc<Repo>>, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
     for project in BufReader::new(project_file).lines() {
         let rel_path = project?;
-        repos.push(Arc::new(Repo::from(
-            base_folder.join(&rel_path),
-            rel_path,
-        )));
+        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
     }
 
     if include_manifest {
         let rel_path = ".repo/manifests".to_owned();
-        repos.push(Arc::new(Repo::from(
-            base_folder.join(&rel_path),
-            rel_path,
-        )));
+        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
     }
 
     Ok(repos)

@@ -2,13 +2,13 @@ use crate::config::Config;
 use crate::repo_history::model::{MultiRepoHistory, RepoCommit};
 use crate::repo_history::{DiffView, MainView};
 use crate::ui_common::SeperatorView;
+use cursive::XY;
 use cursive::event::{Event, Key};
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::{Nameable, Resizable, View};
 use cursive::views::ViewRef;
 use cursive::views::{Canvas, LayerPosition, LinearLayout, ResizedView};
 use cursive::{Cursive, CursiveExt};
-use cursive::XY;
 
 fn build_status_bar(
     commits: usize,
@@ -42,10 +42,10 @@ fn build_status_bar(
 
 fn update(siv: &mut Cursive, index: usize, commits: usize, entry: &RepoCommit) {
     let mut diff_view: ViewRef<DiffView> = siv.find_name("diffView").unwrap();
-    diff_view.set_commit(&entry);
+    diff_view.set_commit(entry);
 
     let mut main_view: ViewRef<MainView> = siv.find_name("mainView").unwrap();
-    main_view.update_commit_bar(index, commits, &entry);
+    main_view.update_commit_bar(index, commits, entry);
 }
 
 pub fn show(model: MultiRepoHistory, config: Config) {
@@ -61,7 +61,7 @@ pub fn show(model: MultiRepoHistory, config: Config) {
             let locally_missing_commits = model.locally_missing_commits;
 
             let first_commit = if commits > 0 {
-                Some(model.commits.get(0).unwrap().clone())
+                Some(model.commits.first().unwrap().clone())
             } else {
                 None
             };
@@ -73,9 +73,9 @@ pub fn show(model: MultiRepoHistory, config: Config) {
             main_view.set_on_select(
                 move |siv: &mut Cursive, _row: usize, index: usize, entry: &RepoCommit| {
                     let mut diff_view: ViewRef<DiffView> = siv.find_name("diffView").unwrap();
-                    diff_view.set_commit(&entry);
+                    diff_view.set_commit(entry);
                     let mut main_view: ViewRef<MainView> = siv.find_name("mainView").unwrap();
-                    main_view.update_commit_bar(index, commits, &entry);
+                    main_view.update_commit_bar(index, commits, entry);
                 },
             );
             let landscape_format = screen_size.x / (screen_size.y * 3) >= 1;

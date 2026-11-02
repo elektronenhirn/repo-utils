@@ -26,13 +26,13 @@ use std::sync::Arc;
 
 // External Dependencies ------------------------------------------------------
 use cursive::{
+    Cursive, Printer, Rect, With,
     align::HAlign,
     direction::Direction,
     event::{Callback, Event, EventResult, Key, MouseButton, MouseEvent},
     theme,
     vec::Vec2,
-    view::{scroll, CannotFocus, View},
-    Cursive, Printer, Rect, With,
+    view::{CannotFocus, View, scroll},
 };
 
 /// A trait for displaying and sorting items inside a
@@ -67,7 +67,7 @@ type IndexCallback = Arc<dyn Fn(&mut Cursive, usize, usize) + Send + Sync>;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// # extern crate cursive;
 /// # extern crate cursive_table_view;
 /// # use std::cmp::Ordering;
@@ -575,10 +575,10 @@ where
     pub fn remove_item(&mut self, item_index: usize) -> Option<T> {
         if item_index < self.items.len() {
             // Move the selection if the currently selected item gets removed
-            if let Some(selected_index) = self.item() {
-                if selected_index == item_index {
-                    self.focus_up(1);
-                }
+            if let Some(selected_index) = self.item()
+                && selected_index == item_index
+            {
+                self.focus_up(1);
             }
 
             // Remove the sorted reference to the item
@@ -604,7 +604,7 @@ where
         self.set_selected_row(0);
         self.rows_to_items.clear();
         self.needs_relayout = true;
-        self.items.drain(0..).collect()
+        std::mem::take(&mut self.items)
     }
 }
 
@@ -790,7 +790,7 @@ where
             } if !self.is_empty()
                 && position
                     .checked_sub(offset)
-                    .map_or(false, |p| p.y == self.focus) =>
+                    .is_some_and(|p| p.y == self.focus) =>
             {
                 self.column_cancel();
                 return self.on_submit_event();
@@ -825,7 +825,7 @@ where
     }
 
     fn on_submit_event(&mut self) -> EventResult {
-        if let Some(ref cb) = &self.on_submit {
+        if let Some(cb) = &self.on_submit {
             let cb = Arc::clone(cb);
             let row = self.row().unwrap();
             let index = self.item().unwrap();
@@ -898,17 +898,17 @@ where
                 position,
                 offset,
                 event: MouseEvent::Press(MouseButton::Left),
-            } if position.checked_sub(offset).map_or(false, |p| p.y == 0) => {
-                if let Some(position) = position.checked_sub(offset) {
-                    if let Some(col) = self.column_for_x(position.x) {
-                        if self.column_select && self.columns[col].selected {
-                            return EventResult::Ignored;
-                        } else {
-                            let active = self.active_column();
-                            self.columns[active].selected = false;
-                            self.columns[col].selected = true;
-                            self.column_select = true;
-                        }
+            } if position.checked_sub(offset).is_some_and(|p| p.y == 0) => {
+                if let Some(position) = position.checked_sub(offset)
+                    && let Some(col) = self.column_for_x(position.x)
+                {
+                    if self.column_select && self.columns[col].selected {
+                        return EventResult::Ignored;
+                    } else {
+                        let active = self.active_column();
+                        self.columns[active].selected = false;
+                        self.columns[col].selected = true;
+                        self.column_select = true;
                     }
                 }
                 EventResult::Ignored

@@ -1,6 +1,6 @@
 use crate::repo_history::model::RepoCommit;
-use crate::ui_common::styles::{BLUE, GREEN, LIGHT_BLUE, MAGENTA, RED, WHITE, YELLOW};
 use crate::ui_common::ListView;
+use crate::ui_common::styles::{BLUE, GREEN, LIGHT_BLUE, MAGENTA, RED, WHITE, YELLOW};
 use cursive::theme::ColorStyle;
 use cursive::view::ViewWrapper;
 use std::process::Command;
@@ -27,18 +27,18 @@ impl DiffView {
 
         // we first add the output of git show without diff (does not work nicely for merge
         // commits yet - but support will come in never versions of git-show...)
-        self.add_git_show_output(&entry);
+        self.add_git_show_output(entry);
 
         self.list_view
             .insert_colorful_string("―――".to_string(), *YELLOW);
 
         // now at the diff output between the given commit and its first parent
         // this will then also work nicely with merge commits
-        self.add_git_diff_output(&entry);
+        self.add_git_diff_output(entry);
     }
 
     #[rustfmt::skip]
-    fn add_git_show_output(self: &mut Self, entry: &RepoCommit){
+    fn add_git_show_output(&mut self, entry: &RepoCommit){
         let output = Command::new("git")
                      .current_dir(&entry.repo.abs_path)
                      .arg("--no-pager")
@@ -58,7 +58,7 @@ impl DiffView {
     }
 
     #[rustfmt::skip]
-    fn add_git_diff_output(self: &mut Self, entry: &RepoCommit){
+    fn add_git_diff_output(&mut self, entry: &RepoCommit){
         let output = Command::new("git")
                      .current_dir(&entry.repo.abs_path)
                      .arg("--no-pager")
@@ -99,10 +99,10 @@ impl DiffView {
                 return *cc.1;
             }
         }
-        return *WHITE;
+        *WHITE
     }
 
-    pub fn commit(self: &Self) -> &Option<RepoCommit> {
+    pub fn commit(&self) -> &Option<RepoCommit> {
         &self.commit
     }
 }

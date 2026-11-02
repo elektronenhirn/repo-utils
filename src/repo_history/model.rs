@@ -6,8 +6,8 @@ use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressSt
 use rayon::prelude::*;
 use std::fmt;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A history of commits across multiple repositories
 pub struct MultiRepoHistory {
@@ -64,7 +64,7 @@ impl MultiRepoHistory {
                     progress_error("Failed query history", &e);
                     return Vec::new();
                 }
-                
+
                 if rewalk_strategy == &RevWalkStrategy::FirstParent {
                     let _ = revwalk.simplify_first_parent();
                 }
@@ -72,13 +72,14 @@ impl MultiRepoHistory {
 
                 let mut commits = Vec::new();
                 for commit_id in revwalk {
-                    let commit = match commit_id.and_then(|commit_id| git_repo.find_commit(commit_id)) {
-                        Ok(commit) => commit,
-                        Err(_e) => {
-                            missing_commits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                            continue;
-                        }
-                    };
+                    let commit =
+                        match commit_id.and_then(|commit_id| git_repo.find_commit(commit_id)) {
+                            Ok(commit) => commit,
+                            Err(_e) => {
+                                missing_commits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                                continue;
+                            }
+                        };
                     let (include, abort) = classifier.classify(&commit);
                     if include {
                         commits.push(RepoCommit::from(repo.clone(), &commit));
@@ -104,17 +105,15 @@ impl MultiRepoHistory {
         })
     }
 
-    fn create_progress_bars(
-        repos: &Vec<Arc<Repo>>,
-    ) -> (MultiProgress, Vec<ProgressBar>, ProgressBar) {
+    fn create_progress_bars(repos: &[Arc<Repo>]) -> (MultiProgress, Vec<ProgressBar>, ProgressBar) {
         let progress = MultiProgress::new();
         let progress_bars = (0..rayon::current_num_threads())
             .enumerate()
             .map(|(n, _)| {
-                let pb = ProgressBar::hidden()
-                .with_prefix(n.to_string())
-                .with_style(
-                    ProgressStyle::default_spinner().template("[{prefix}] {wide_msg:.bold.dim}").expect("Valid template"),
+                let pb = ProgressBar::hidden().with_prefix(n.to_string()).with_style(
+                    ProgressStyle::default_spinner()
+                        .template("[{prefix}] {wide_msg:.bold.dim}")
+                        .expect("Valid template"),
                 );
                 progress.add(pb)
             })
@@ -122,7 +121,8 @@ impl MultiRepoHistory {
         let overall_progress = ProgressBar::new(repos.len() as u64);
         overall_progress.set_style(
             ProgressStyle::default_bar()
-                .template(" {spinner:.bold.cyan}  Scanned {pos} of {len} repositories").expect("Valid template"),
+                .template(" {spinner:.bold.cyan}  Scanned {pos} of {len} repositories")
+                .expect("Valid template"),
         );
         let overall_progress = progress.add(overall_progress);
         (progress, progress_bars, overall_progress)
@@ -131,7 +131,7 @@ impl MultiRepoHistory {
 
 impl fmt::Debug for MultiRepoHistory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        println!("Commits: {}", self.commits.len());
+        writeln!(f, "Commits: {}", self.commits.len())?;
         for commit in &self.commits {
             write!(f, "{:?}", commit)?;
         }

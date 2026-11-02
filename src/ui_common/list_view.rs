@@ -25,14 +25,14 @@ use std::cmp;
 use std::sync::Arc;
 
 // External Dependencies ------------------------------------------------------
+use cursive::Rect;
+use cursive::With;
 use cursive::direction::Direction;
 use cursive::event::{Callback, Event, EventResult, Key, MouseButton, MouseEvent};
 use cursive::theme::{ColorStyle, Style};
 use cursive::utils::span::{SpannedStr, SpannedString};
 use cursive::vec::Vec2;
-use cursive::view::{scroll, CannotFocus, View};
-use cursive::With;
-use cursive::Rect;
+use cursive::view::{CannotFocus, View, scroll};
 use cursive::{Cursive, Printer};
 
 /// Callback taking as argument the row and the index of an element.
@@ -324,10 +324,10 @@ impl ListView {
     pub fn remove_item(&mut self, item_index: usize) -> Option<SpannedString<Style>> {
         if item_index < self.items.len() {
             // Move the selection if the currently selected item gets removed
-            if let Some(selected_index) = self.item() {
-                if selected_index == item_index {
-                    self.focus_up(1);
-                }
+            if let Some(selected_index) = self.item()
+                && selected_index == item_index
+            {
+                self.focus_up(1);
             }
 
             // Remove the sorted reference to the item
@@ -354,7 +354,7 @@ impl ListView {
         self.set_selected_row(0);
         self.rows_to_items.clear();
         self.needs_relayout = true;
-        self.items.drain(0..).collect()
+        std::mem::take(&mut self.items)
     }
 }
 
@@ -447,7 +447,7 @@ impl ListView {
             } if !self.is_empty()
                 && position
                     .checked_sub(offset)
-                    .map_or(false, |p| p.y == self.focus) =>
+                    .is_some_and(|p| p.y == self.focus) =>
             {
                 return self.on_submit_event();
             }
@@ -474,7 +474,7 @@ impl ListView {
     }
 
     fn on_submit_event(&mut self) -> EventResult {
-        if let Some(ref cb) = &self.on_submit {
+        if let Some(cb) = &self.on_submit {
             let cb = Arc::clone(cb);
             let row = self.row().unwrap();
             let index = self.item().unwrap();
