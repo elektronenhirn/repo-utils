@@ -64,6 +64,34 @@ Options:
   -V, --version          Print version information
 ```
 
+### repo-delta
+
+Find commits which got lost when moving a tree to another Gerrit server. Run it inside a
+checkout synced from the *old* server. For every project, the commits of the checked-out
+branch are compared with the branch fetched from the *new* server (as defined by the new
+server's manifest). Commits are matched by commit id or by their `Change-Id` trailer, so
+slightly rewritten history is not reported. Merge commits are ignored; commits without a
+Change-Id are matched by commit id only. Exits with 1 if anything is missing.
+
+```
+Usage: repo-delta [OPTIONS] --new-manifest-url <URL>
+
+Options:
+  -C, --cwd <DIR>                        change working directory (mostly useful for testing)
+  -m, --manifest <FILE>                  ignore projects which are not defined in the given manifest file(s)
+  -g, --group <GROUP>                    ignore projects which are not part of the given group(s)
+      --new-manifest-url <URL>           URL of the manifest repository on the new server
+      --new-manifest-branch <BRANCH>     branch of the new manifest repository [default: branch this checkout was initialized with]
+      --new-manifest-file <FILE>         manifest file within the new manifest repository [default: default.xml]
+      --since <DATE>                     only consider commits since the given date (YYYY-MM-DD)
+  -j, --jobs <JOBS>                      number of projects to compare in parallel [default: 8]
+      --keep-refs                        keep the temporary refs/repo-delta/new ref in each repository
+  -v, --verbose                          list every missing commit
+```
+
+Note that the tool fetches from the new server into your existing repositories (into the
+temporary ref `refs/repo-delta/new`, removed afterwards), so that your git credentials work.
+
 ### repo-restore
 
 ```
