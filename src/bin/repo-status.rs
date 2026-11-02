@@ -6,9 +6,9 @@ use git2::{Repository, StatusOptions};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use repo_utils::repo_project_selector::{
-    find_repo_manifests_folder, find_repo_root_folder, select_projects,
+    find_repo_root_folder, lookup_sync_branch_name, select_projects,
 };
-use std::{convert::TryInto, env, process::Command, str, time::Instant};
+use std::{convert::TryInto, env, str, time::Instant};
 
 /// Check if repos managed by git-repo have local-only or uncommited changes,
 /// see https://github.com/elektronenhirn/repo-utils
@@ -157,28 +157,5 @@ impl GitStatus {
         if verbose && !self.uncomitted_changes && self.local_commits == 0 {
             println!("{}: clean", self.path.green());
         }
-    }
-}
-
-// The repo tool maintains a branch tracking the last synced state
-// It is typically named "m/<manifest-branch>" where manifest-branch
-// is the branch used for "repo init".
-fn lookup_sync_branch_name() -> Result<String> {
-    // in .repo/manifests
-    //git for-each-ref --format '%(upstream:lstrip=-1)' "$(git symbolic-ref -q HEAD)"
-
-    let manifests_folder = find_repo_manifests_folder()?;
-
-    let output = Command::new("sh")
-        .current_dir(&manifests_folder)
-        .arg("-c")
-        .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
-        .output()?;
-
-    if output.status.success() {
-        let branch_name = String::from_utf8_lossy(&output.stdout);
-        Ok(format!("m/{}", branch_name.trim()))
-    } else {
-        bail!(String::from_utf8_lossy(&output.stderr).into_owned())
     }
 }

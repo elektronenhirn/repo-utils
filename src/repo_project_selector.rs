@@ -1,10 +1,11 @@
 use anyhow::{Result, anyhow, bail};
+use quick_xml::de::from_reader;
 use serde::Deserialize;
-use serde_xml_rs::from_reader;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// The repo-tool keeps a list of synced projects at
 /// .repo/project.list
@@ -131,11 +132,18 @@ pub struct Manifest {
     pub projects: Vec<Project>,
     #[serde(rename = "include", default)]
     pub includes: Vec<Include>,
+    #[serde(rename = "remote", default)]
+    pub remotes: Vec<Remote>,
+    pub default: Option<DefaultSettings>,
 }
 
 impl Manifest {
     pub fn append(&mut self, manifest: &Manifest) {
         self.projects.extend(manifest.projects.iter().cloned());
+        self.remotes.extend(manifest.remotes.iter().cloned());
+        if self.default.is_none() {
+            self.default.clone_from(&manifest.default);
+        }
     }
 
     pub fn contains_project(&self, local_path: &str) -> bool {
@@ -145,17 +153,162 @@ impl Manifest {
     pub fn find_project(&self, local_path: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.path == local_path)
     }
+
+    /// Returns the remote the given project is fetched from: the
+    /// project's own remote or the manifest's default remote.
+    fn project_remote(&self, project: &Project) -> Result<&Remote> {
+        let remote_name = project
+            .remote
+            .as_deref()
+            .or_else(|| self.default.as_ref().and_then(|d| d.remote.as_deref()))
+            .ok_or_else(|| anyhow!("no remote defined for project {}", project.name))?;
+        self.remotes
+            .iter()
+            .find(|r| r.name == remote_name)
+            .ok_or_else(|| anyhow!("unknown remote {remote_name} for project {}", project.name))
+    }
+
+    /// Returns the URL the given project can be fetched from, resolving
+    /// the project's remote (or the default remote) relative to the
+    /// URL the manifest has been cloned from.
+    pub fn project_url(&self, project: &Project, manifest_url: &str) -> Result<String> {
+        let remote = self.project_remote(project)?;
+        Ok(join_url(
+            &resolve_url(manifest_url, &remote.fetch),
+            &project.name,
+        ))
+    }
+
+    /// Returns the revision (branch, tag or sha) of the given project.
+    /// Like in repo, the project's own revision wins over the revision
+    /// of its remote, which wins over the manifest's default revision.
+    pub fn project_revision<'a>(&'a self, project: &'a Project) -> Option<&'a str> {
+        project
+            .revision
+            .as_deref()
+            .or_else(|| {
+                self.project_remote(project)
+                    .ok()
+                    .and_then(|r| r.revision.as_deref())
+            })
+            .or_else(|| self.default.as_ref().and_then(|d| d.revision.as_deref()))
+    }
+}
+
+/// Resolves a remote's `fetch` attribute against the URL of the manifest
+/// repository, the way the repo tool does (RFC 3986 relative resolution,
+/// so `..` on `https://host/platform/manifest` yields `https://host`).
+pub fn resolve_url(manifest_url: &str, fetch: &str) -> String {
+    let fetch_is_absolute = fetch.contains("://")
+        || fetch
+            .split_once(':')
+            .is_some_and(|(host, _)| !host.is_empty() && !host.contains('/'));
+    if fetch_is_absolute {
+        return fetch.to_owned();
+    }
+
+    // Split the manifest url into a prefix (scheme and host, or the
+    // host of an scp-like url) and the path relative segments apply to.
+    let (prefix, path) = if let Some(scheme_end) = manifest_url.find("://") {
+        let host_start = scheme_end + 3;
+        match manifest_url[host_start..].find('/') {
+            Some(slash) => manifest_url.split_at(host_start + slash),
+            None => (manifest_url, ""),
+        }
+    } else if let Some(colon) = manifest_url.find(':') {
+        manifest_url.split_at(colon + 1)
+    } else {
+        ("", manifest_url)
+    };
+
+    let mut segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    segments.pop(); // the manifest repository itself
+    for segment in fetch.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                segments.pop();
+            }
+            other => segments.push(other),
+        }
+    }
+
+    let joined = segments.join("/");
+    if prefix.ends_with(':') {
+        format!("{prefix}{joined}")
+    } else if prefix.is_empty() && !path.starts_with('/') {
+        joined
+    } else {
+        format!("{prefix}/{joined}")
+    }
+}
+
+/// Appends a project name to a remote's base url
+pub fn join_url(base: &str, name: &str) -> String {
+    let name = name.trim_start_matches('/');
+    if base.is_empty() || base.ends_with(':') || base.ends_with('/') {
+        format!("{base}{name}")
+    } else {
+        format!("{base}/{name}")
+    }
+}
+
+/// The repo tool maintains a branch tracking the last synced state
+/// It is typically named "m/<manifest-branch>" where manifest-branch
+/// is the branch used for "repo init".
+pub fn lookup_sync_branch_name() -> Result<String> {
+    let manifests_folder = find_repo_manifests_folder()?;
+
+    let output = Command::new("sh")
+        .current_dir(&manifests_folder)
+        .arg("-c")
+        .arg("git for-each-ref --format '%(upstream:lstrip=-1)' \"$(git symbolic-ref -q HEAD)\"")
+        .output()?;
+
+    if output.status.success() {
+        let branch_name = String::from_utf8_lossy(&output.stdout);
+        Ok(format!("m/{}", branch_name.trim()))
+    } else {
+        bail!(String::from_utf8_lossy(&output.stderr).into_owned())
+    }
 }
 
 /// OO representation of a repo-tool's project xml element
 #[derive(Debug, Deserialize, Clone)]
+#[serde(from = "RawProject")]
 pub struct Project {
-    #[serde(rename = "@name")]
     pub name: String,
-    #[serde(rename = "@path")]
+    /// local path of the project; defaults to the name, like in repo
     pub path: String,
-    #[serde(rename = "@groups")]
     pub groups: Option<String>,
+    pub remote: Option<String>,
+    pub revision: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawProject {
+    #[serde(rename = "@name")]
+    name: String,
+    #[serde(rename = "@path")]
+    path: Option<String>,
+    #[serde(rename = "@groups")]
+    groups: Option<String>,
+    #[serde(rename = "@remote")]
+    remote: Option<String>,
+    #[serde(rename = "@revision")]
+    revision: Option<String>,
+}
+
+impl From<RawProject> for Project {
+    fn from(raw: RawProject) -> Self {
+        Self {
+            path: raw.path.unwrap_or_else(|| raw.name.clone()),
+            name: raw.name,
+            groups: raw.groups,
+            remote: raw.remote,
+            revision: raw.revision,
+        }
+    }
 }
 
 impl Project {
@@ -176,4 +329,24 @@ impl Project {
 pub struct Include {
     #[serde(rename = "@name")]
     pub name: String,
+}
+
+/// OO representation of a repo-tool's remote xml element
+#[derive(Debug, Deserialize, Clone)]
+pub struct Remote {
+    #[serde(rename = "@name")]
+    pub name: String,
+    #[serde(rename = "@fetch")]
+    pub fetch: String,
+    #[serde(rename = "@revision")]
+    pub revision: Option<String>,
+}
+
+/// OO representation of a repo-tool's default xml element
+#[derive(Debug, Deserialize, Clone)]
+pub struct DefaultSettings {
+    #[serde(rename = "@remote")]
+    pub remote: Option<String>,
+    #[serde(rename = "@revision")]
+    pub revision: Option<String>,
 }
