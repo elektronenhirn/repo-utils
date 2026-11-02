@@ -163,8 +163,11 @@ impl Manifest {
 /// OO representation of a repo-tool's project xml element
 #[derive(Debug, Deserialize, Clone)]
 pub struct Project {
+    #[serde(rename = "@name")]
     pub name: String,
+    #[serde(rename = "@path")]
     pub path: String,
+    #[serde(rename = "@groups")]
     pub groups: Option<String>,
 }
 
@@ -184,5 +187,6 @@ impl Project {
 /// OO representation of a repo-tool's include xml element
 #[derive(Debug, Deserialize, Clone)]
 pub struct Include {
+    #[serde(rename = "@name")]
     pub name: String,
 }

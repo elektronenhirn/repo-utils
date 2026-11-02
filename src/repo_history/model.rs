@@ -179,7 +179,7 @@ impl RepoCommit {
         Self {
             repo,
             commit_time: commit.time(),
-            summary: commit.summary().unwrap_or("None").to_owned(),
+            summary: commit.summary().ok().flatten().unwrap_or("None").to_owned(),
             author: commit.author().name().unwrap_or("None").to_owned(),
             committer: commit.committer().name().unwrap_or("None").to_owned(),
             commit_id: commit.id(),
