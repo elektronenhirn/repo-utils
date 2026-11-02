@@ -1,33 +1,26 @@
-on: [push]
+on: [push, pull_request]
 name: build
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - name: build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+        run: cargo build --all-targets
       - name: test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
       - name: format
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
       - name: lint
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
-      - name: Security audit
-        uses: actions-rs/audit-check@v1
+        run: cargo clippy --all-targets --all-features -- -D warnings
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
